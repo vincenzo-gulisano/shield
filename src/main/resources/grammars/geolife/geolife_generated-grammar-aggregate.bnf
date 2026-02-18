@@ -1,0 +1,15 @@
+<pipeline> ::= <operator> | <operator> <pipeline>
+<operator> ::= <filter> | <map_duplicate> | <map_noise> | <map_aggregate>
+<filter> ::= <attribute> <condition> <value>
+<map_duplicate> ::= <probability>
+<map_noise> ::= <attribute> <percentage>
+<map_aggregate> ::= <attribute> <agg_fun> <window_size>
+<attribute> ::= 'avg_X' | 'avg_Y'
+<condition> ::= lt | gt
+<value> ::= <dig> . <dig> <dig> E <sign> <dig>
+<dig> ::= 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
+<sign> ::= + | -
+<agg_fun> ::= min | avg | max
+<window_size> ::= 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10
+<probability> ::= 0.1 | 0.2 | 0.3 | 0.4 | 0.5 | 0.6 | 0.7 | 0.8 | 0.9 | 1.0
+<percentage> ::= 0.01 | 0.05 | 0.10 | 0.25
