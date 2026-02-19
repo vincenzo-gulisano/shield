@@ -4,7 +4,7 @@ import io.github.ericmedvet.jnb.core.Cacheable;
 import io.github.ericmedvet.jnb.core.Discoverable;
 import mappers.Mapper;
 
-@Discoverable(prefixTemplate = "silvia.mapper")
+@Discoverable(prefixTemplate = "anonym.mapper")
 public class MapperBuilder {
 
     private MapperBuilder() {

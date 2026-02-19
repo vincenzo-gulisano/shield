@@ -7,9 +7,9 @@ ea.experiment(
         stop = ea.sc.nOfQualityEvaluations(n = 5000);
         representation = ea.r.cfgTree(grammar = ea.grammar.fromFile(
             path = "src/main/resources/grammars/airQuality/airQuality_generated-grammar-aggregate.bnf"));
-        mapper = silvia.mapper.treeToQueryMapper()
+        mapper = anonym.mapper.treeToQueryMapper()
       );
-      problem = silvia.problem.anonymizationProblem2OPerf(
+      problem = anonym.problem.anonymizationProblem2OPerf(
         inputCsvPath = "datasets/airQuality_parallel.csv";
         grammarPath = "src/main/resources/grammars/airQuality/airQuality_generated-grammar-aggregate.bnf";
         privacyMetric = K_ANONYMITY_CARDINALITY_MAX;

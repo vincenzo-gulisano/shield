@@ -117,7 +117,7 @@ In these files the `representation` block must point to the correct **grammar fi
       representation = ea.r.cfgTree(grammar = ea.grammar.fromFile(
         path = "src/main/resources/grammars/airQuality/airQuality_generated-grammar-aggregate.bnf"));
 ...
-    problem = silvia.problem.anonymizationProblem(
+    problem = anonym.problem.anonymizationProblem(
       inputCsvPath = "datasets/airQuality_parallel.csv";
       grammarPath = "src/main/resources/grammars/airQuality/airQuality_generated-grammar-aggregate.bnf";
       privacyMetric = K_ANONYMITY_CARDINALITY_MAX;

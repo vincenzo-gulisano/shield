@@ -8,7 +8,7 @@ import problem.StreamAnonymizationProblem_2ObjectivesPerf;
 import problem.StreamAnonymizationProblem_2ObjectivesRes;
 import problem.utils.PrivacyMetricChoice;
 
-@Discoverable(prefixTemplate = "silvia.problem")
+@Discoverable(prefixTemplate = "anonym.problem")
 public class ProblemBuilder {
 
     private ProblemBuilder() {
