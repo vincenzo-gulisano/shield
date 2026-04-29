@@ -1,0 +1,9 @@
+<pipeline> ::= <operator> | <operator> <pipeline>
+<operator> ::= <filter> | <map_rir>
+<filter> ::= <attribute> <condition> <value>
+<map_rir> ::= <attribute>
+<attribute> ::= 'avg_X' | 'avg_Y'
+<condition> ::= lt | gt
+<value> ::= <dig> . <dig> <dig> E <sign> <dig>
+<dig> ::= 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
+<sign> ::= + | -
