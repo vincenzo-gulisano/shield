@@ -28,6 +28,21 @@ public class ProblemBuilder {
         return new StreamAnonymizationProblem(inputCsvPath, keyColumn, privacyMetric, isFilterOnly);
     }
 
+
+    // Create a problem with 3 objectives
+    @SuppressWarnings("unused")
+    @Cacheable
+    public static StreamAnonymizationProblem medicalDataAnonymizationProblem(
+            @Param("inputCsvPath") String inputCsvPath,
+            @Param("grammarPath") String grammarPath,
+            @Param(value = "privacyMetric", dS = "K_ANONYMITY_CARDINALITY") PrivacyMetricChoice privacyMetric,
+            @Param(value = "keyColumn", dS = "") String keyColumn,
+            @Param(value = "name", iS = "{inputCsvPath}") String name
+    ) throws Exception {
+        boolean isFilterOnly = grammarPath.toLowerCase().contains("filters");
+        return new StreamAnonymizationProblem(inputCsvPath, keyColumn, privacyMetric, isFilterOnly);
+    }
+
     // Create a problem with 2 objectives: results similarity and privacy
     @SuppressWarnings("unused")
     @Cacheable
