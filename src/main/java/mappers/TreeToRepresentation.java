@@ -42,6 +42,7 @@ public class TreeToRepresentation {
             case "<filter>" -> operator = parseFilterNode(specificOpNode);
             case "<map_duplicate>" -> operator = parseMapDuplicateNode(specificOpNode);
             case "<map_noise>" -> operator = parseMapNoiseNode(specificOpNode);
+            case "<map_rir>" -> operator = parseMapRirNode(specificOpNode);
             case "<map_aggregate>" -> operator = parseMapAggregateNode(specificOpNode);
             default -> logger.warn("Unknown operator type found in grammar tree: {}", specificOpNode.content());
         }
@@ -93,19 +94,18 @@ public class TreeToRepresentation {
         }
     }
 
-    // Parse a single duplicate map node
-    private QueryRepresentation.OperatorNode parseMapDuplicateNode(Tree<String> mapNode) {
+    // Parse a single RIR map node
+    private QueryRepresentation.OperatorNode parseMapRirNode(Tree<String> mapNode) {
         try{
             // Search for the child <probability> in the node
             Tree<String> probNode = mapNode.child(0);
-            String probString = findFirstTerminal(probNode);
-            Double probValue = Double.parseDouble(probString);
-            // Create the specific arguments object for a duplicate map
-            QueryRepresentation.MapDuplicateArgs args = new QueryRepresentation.MapDuplicateArgs(probValue);
+            String attribute = findFirstTerminal(probNode);
+            // Create the specific arguments object for a RIR map
+            QueryRepresentation.MapRIRArgs args = new QueryRepresentation.MapRIRArgs(attribute);
 
-            return new QueryRepresentation.OperatorNode(QueryRepresentation.Operator.MAP_DUPLICATE, args);
+            return new QueryRepresentation.OperatorNode(QueryRepresentation.Operator.MAP_RIR, args);
         } catch (Exception e) {
-            logger.warn("Error parsing duplicate map node", e);
+            logger.warn("Error parsing rir map node", e);
             return null;
         }
     }
@@ -134,6 +134,23 @@ public class TreeToRepresentation {
             return new QueryRepresentation.OperatorNode(QueryRepresentation.Operator.MAP_NOISE, args);
         } catch (Exception e) {
             logger.warn("Error parsing noise map node", e);
+            return null;
+        }
+    }
+
+    // Parse a single duplicate map node
+    private QueryRepresentation.OperatorNode parseMapDuplicateNode(Tree<String> mapNode) {
+        try{
+            // Search for the child <probability> in the node
+            Tree<String> probNode = mapNode.child(0);
+            String probString = findFirstTerminal(probNode);
+            Double probValue = Double.parseDouble(probString);
+            // Create the specific arguments object for a duplicate map
+            QueryRepresentation.MapDuplicateArgs args = new QueryRepresentation.MapDuplicateArgs(probValue);
+
+            return new QueryRepresentation.OperatorNode(QueryRepresentation.Operator.MAP_DUPLICATE, args);
+        } catch (Exception e) {
+            logger.warn("Error parsing duplicate map node", e);
             return null;
         }
     }

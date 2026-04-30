@@ -10,6 +10,8 @@ import event.GenericEvent;
 import mappers.QueryRepresentation;
 import query.utils.MovingAggregateMap;
 import query.utils.OperatorUtils;
+import query.utils.RIRMap;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -148,6 +150,23 @@ public class LiebreAnonymizationQuery {
                     query.connect(lastOperatorInChain, aggregateOperator);
                     lastOperatorInChain = aggregateOperator;
                     break;
+
+                case MAP_RIR:
+                    QueryRepresentation.MapRIRArgs rirArgs =
+                            (QueryRepresentation.MapRIRArgs) node.arguments();
+
+                    Operator<GenericEvent, GenericEvent> rirMapOperator =
+                            query.addMapOperator(
+                                    operatorId,
+                                    new RIRMap(rirArgs.attribute())
+                            );
+
+                    query.connect(lastOperatorInChain, rirMapOperator);
+                    lastOperatorInChain = rirMapOperator;
+                    break;
+
+                default:
+                    logger.warn("Unsupported operator type in representation: {}", node.type());
             }
         }
 

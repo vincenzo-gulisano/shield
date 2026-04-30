@@ -4,6 +4,8 @@ import java.io.Serializable;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import mappers.QueryRepresentation.OperatorArguments;
+
 // Query Representation (phenotype)
 public record QueryRepresentation(
         // Contains a sequence of operators
@@ -15,6 +17,7 @@ public record QueryRepresentation(
         FILTER,
         MAP_DUPLICATE,
         MAP_NOISE,
+        MAP_RIR,
         MAP_AGGREGATE
     }
 
@@ -107,6 +110,17 @@ public record QueryRepresentation(
         @Override
         public String toString() {
             return String.format("probability=%.2f", probability);
+        }
+    }
+
+    // Arguments for a map duplicate operator
+    public record MapRIRArgs(
+            String attribute
+    ) implements OperatorArguments {
+
+        @Override
+        public String toString() {
+            return String.format("attribute=%s", attribute);
         }
     }
 
