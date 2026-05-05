@@ -1,12 +1,27 @@
+/*
+ * Copyright 2026 eric
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package mappers;
 
+import static mappers.utils.TreeUtils.findFirstTerminal;
+
 import io.github.ericmedvet.jgea.core.representation.tree.Tree;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.List;
-
-import static mappers.utils.TreeUtils.findFirstTerminal;
 
 // Class responsible for parsing the grammar derivation tree (genotype) and translating it
 // into a structured QueryRepresentation (phenotype)
@@ -44,6 +59,7 @@ public class TreeToRepresentation {
             case "<map_noise>" -> operator = parseMapNoiseNode(specificOpNode);
             case "<map_rir>" -> operator = parseMapRirNode(specificOpNode);
             case "<map_aggregate>" -> operator = parseMapAggregateNode(specificOpNode);
+            // TODO ideally, here you should handle also "<fork_ops_join>"
             default -> logger.warn("Unknown operator type found in grammar tree: {}", specificOpNode.content());
         }
 
