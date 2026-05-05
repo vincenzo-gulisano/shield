@@ -4,7 +4,7 @@
 <map_duplicate> ::= <probability>
 <map_noise> ::= <attribute> <percentage>
 <map_aggregate> ::= <attribute> <agg_fun> <window_size>
-<fork_ops_join> ::= <operator> <operator>
+<fork_ops_join> ::= <pipeline> <pipeline>
 <attribute> ::= 'avg_X' | 'avg_Y'
 <condition> ::= lt | gt
 <value> ::= <dig> . <dig> <dig> E <sign> <dig>
