@@ -2,8 +2,6 @@ package query;
 
 import common.util.Util;
 import component.operator.Operator;
-import component.operator.in1.aggregate.BaseTimeWindowAddRemove;
-import component.operator.in1.aggregate.TimeWindowAddRemove;
 import component.operator.in1.map.MapFunction;
 import component.sink.Sink;
 import component.source.Source;
