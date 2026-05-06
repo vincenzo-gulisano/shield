@@ -6,14 +6,13 @@ ea.experiment(
       solver = ea.s.nsga2(
         stop = ea.sc.nOfQualityEvaluations(n = 500);
         representation = ea.r.cfgTree(grammar = ea.grammar.fromFile(
-            path = "src/main/resources/grammars/geolife/geolife_generated-grammar-map-rir.bnf"));
+            path = "src/main/resources/grammars/forkjoin.synthetic/forkjoin.synthetic.all.bnf"));
         mapper = anonym.mapper.treeToQueryMapper()
       );
-      problem = anonym.problem.medicalDataAnonymizationProblem(
-        inputCsvPath = "datasets/geolife_5mins.csv";
-        grammarPath = "src/main/resources/grammars/geolife/geolife_generated-grammar-map-rir.bnf";
-        privacyMetric = K_ANONYMITY_CARDINALITY_Q99;
-        keyColumn = "user"
+      problem = anonym.problem.enhancedStreamAnonymizationProblem(
+        inputCsvPath = "datasets/synthetic.forkjointest.csv";
+        grammarPath = "src/main/resources/grammars/forkjoin.synthetic/forkjoin.synthetic.all.bnf";
+        privacyMetric = K_ANONYMITY_CARDINALITY_Q99
       )
     )
   ];
