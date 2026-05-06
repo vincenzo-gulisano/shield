@@ -18,11 +18,11 @@ public class MainQueryForkJoinTest {
 
     public static QueryResult process(List<GenericEvent> inputStream, String queryId, long minTs, long maxTs) {
 
-        final long resolution = 3600000L;  // 1 hour
-        final double filter1min = 100.0;
-        final double filter1max = 200.0;
-        final double filter2min = 300.0;
-        final double filter2max = 400.0;
+        final long resolution = 3000000L;  // 50 minutes
+        final double filter1min = 4000.0;
+        final double filter1max = 6000.0;
+        final double filter2min = 24000.0;
+        final double filter2max = 26000.0;
 
         // Define the stages to monitor for performance
         StreamStatsWindow statsWindow = new StreamStatsWindow(
