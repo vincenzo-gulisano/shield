@@ -1,8 +1,9 @@
 package usecase.forkjoin.synthetic;
 
 import common.tuple.BaseRichTuple;
+import metrics.privacy.DoubleFieldLookup;
 
-public class Tuple extends BaseRichTuple{
+public class Tuple extends BaseRichTuple implements DoubleFieldLookup {
 
     private final double f1;
     private final double f2;
@@ -27,6 +28,11 @@ public class Tuple extends BaseRichTuple{
             case "f2" -> f2;
             default -> throw new IllegalArgumentException("Unknown field name: " + fieldName);
         };
+    }
+
+    @Override
+    public double lookup(String fieldName) {
+        return getField(fieldName);
     }
 
 }
