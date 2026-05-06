@@ -13,12 +13,14 @@ import java.util.*;
 
 public class MainQuery {
 
-    // Record to contain the final results events and the collected performance metrics
-    public record QueryResult(List<Tuple> events, StreamStatsWindow statsWindow) {}
+    // Record to contain the final results events and the collected performance
+    // metrics
+    public record QueryResult(List<Tuple> events, StreamStatsWindow statsWindow) {
+    }
 
     public static QueryResult process(List<Tuple> inputStream, String queryId, long minTs, long maxTs) {
 
-        final long resolution = 3000000L;  // 50 minutes
+        final long resolution = 60000L; // 1 minute
         final double filter1min = 4000.0;
         final double filter1max = 6000.0;
         final double filter2min = 24000.0;
@@ -64,9 +66,11 @@ public class MainQuery {
             @Override
             public Tuple apply(Tuple t) {
                 if (t != null) {
-                    currentPerformanceMetricTimestamp = (t.getTimestamp() - statsWindowLocal.minTimestamp()) / statsWindowLocal.getResolutionMillis();
-                    long alignedTs = statsWindowLocal.minTimestamp() + currentPerformanceMetricTimestamp * statsWindowLocal.getResolutionMillis();
-                    assert(alignedTs >= statsWindowLocal.minTimestamp());
+                    currentPerformanceMetricTimestamp = (t.getTimestamp() - statsWindowLocal.minTimestamp())
+                            / statsWindowLocal.getResolutionMillis();
+                    long alignedTs = statsWindowLocal.minTimestamp()
+                            + currentPerformanceMetricTimestamp * statsWindowLocal.getResolutionMillis();
+                    assert (alignedTs >= statsWindowLocal.minTimestamp());
                     assert (alignedTs <= statsWindowLocal.maxTimestamp());
                     statsWindowLocal.addTuples(streamId, alignedTs, 1);
                 }
@@ -89,12 +93,10 @@ public class MainQuery {
 
         // Connect the pipeline components
         query.connect(inputSource, recorderAfterSource)
-                .connect(recorderAfterSource, b1f)
+                .connect(List.of(recorderAfterSource), List.of(b1f, b2f))
                 .connect(b1f, recorderAfterBranch1)
-                .connect(recorderAfterSource, b2f)
                 .connect(b2f, recorderAfterBranch2)
-                .connect(recorderAfterBranch2, sink)
-                .connect(recorderAfterBranch2, sink);
+                .connect(List.of(recorderAfterBranch1, recorderAfterBranch2), sink);
 
         query.activate();
 
@@ -133,11 +135,31 @@ public class MainQuery {
                     return null;
                 }
             }
-            @Override public boolean isInputFinished() { return isFinished; }
-            @Override public void enable() { this.enabled = true; }
-            @Override public boolean isEnabled() { return enabled; }
-            @Override public void disable() { this.enabled = false; }
-            @Override public boolean canRun() { return !isFinished; }
+
+            @Override
+            public boolean isInputFinished() {
+                return isFinished;
+            }
+
+            @Override
+            public void enable() {
+                this.enabled = true;
+            }
+
+            @Override
+            public boolean isEnabled() {
+                return enabled;
+            }
+
+            @Override
+            public void disable() {
+                this.enabled = false;
+            }
+
+            @Override
+            public boolean canRun() {
+                return !isFinished;
+            }
         };
     }
 
