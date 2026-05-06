@@ -224,4 +224,35 @@ public final class StreamStatsWindow {
         return getArrayFor(keyCounts, stream);
     }
 
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{minTimestamp=").append(minTimestamp);
+        sb.append(", maxTimestamp=").append(maxTimestamp);
+        sb.append(", resolutionMillis=").append(resolutionMillis);
+        sb.append(",\n tupleCounts=\n");
+        for (String stream : streamNames) {
+            sb.append(" ").append(stream).append(":").append(arrayToString(tupleCounts.get(stream))).append("\n");
+        }
+        sb.append(" keyCounts=\n");
+        for (String stream : streamNames) {
+            sb.append(" ").append(stream).append(":").append(arrayToString(keyCounts.get(stream))).append("\n");
+        }
+        sb.append("}}");
+        return sb.toString();
+    }
+
+    private Object arrayToString(int[] is) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("[");
+        for (int i = 0; i < is.length; i++) {
+            sb.append(is[i]);
+            if (i < is.length - 1) {
+                sb.append(", ");
+            }
+        }
+        sb.append("]");
+        return sb.toString();
+    }
+
 }
