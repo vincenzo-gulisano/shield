@@ -18,21 +18,51 @@ package problem;
 
 import io.github.ericmedvet.jgea.core.problem.SimpleMOProblem;
 import io.github.ericmedvet.jgea.core.representation.graph.Graph;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.SequencedMap;
 import java.util.TreeMap;
 import java.util.function.Function;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import event.GenericEvent;
 import mappers.QueryMapper.Arc;
 import mappers.QueryMapper.OperatorRepresentation;
 import problem.utils.PrivacyMetricChoice;
+import usecase.forkjoin.synthetic.MainQuery;
+import usecase.forkjoin.synthetic.MainQuery.QueryResult;
+import usecase.forkjoin.synthetic.Tuple;
 
 public class EnhancedStreamAnonymizationProblem implements
     SimpleMOProblem<Graph<OperatorRepresentation, Arc>, Double> {
 
-  public EnhancedStreamAnonymizationProblem(String inputCsvPath, PrivacyMetricChoice privacyMetric) {
-    // TODO implement the constructor
+  private static final Logger logger = LoggerFactory.getLogger(StreamAnonymizationProblem.class);
 
+  private final List<Tuple> inputTuples;
+
+  public EnhancedStreamAnonymizationProblem(String inputCsvPath, PrivacyMetricChoice privacyMetric) {
+
+    logger.info("Loading input tuples from {}", inputCsvPath);
+    inputTuples = loadTuples(inputCsvPath);
+
+    logger.info("Executing the main query to get the original results and performance metrics");
+    long minTs = inputTuples.getFirst().getTimestamp();
+    long maxTs = inputTuples.getLast().getTimestamp();
+    QueryResult mainQueryResults = MainQuery.process(inputTuples, "main", minTs, maxTs);
+    logger.info("Main query executed successfully, returning {} results, and the following metrics:\n{}",
+        mainQueryResults.events().size(), mainQueryResults.statsWindow());
   }
 
   private final static SequencedMap<String, Comparator<Double>> OBJECTIVES = new TreeMap<>(
@@ -55,4 +85,41 @@ public class EnhancedStreamAnonymizationProblem implements
       return new TreeMap<>(Map.of());
     };
   }
+
+  /*
+   * The remaining part contains only helper functions
+   */
+
+  private List<Tuple> loadTuples(String inputCsvPath) {
+    List<Tuple> tuples = new ArrayList<>();
+    InputStream is = getClass().getClassLoader().getResourceAsStream(inputCsvPath);
+    try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));) {
+      String line;
+      while ((line = reader.readLine()) != null) {
+        line = line.trim();
+        if (line.isEmpty()) {
+          continue;
+        }
+
+        String[] parts = line.split(",");
+        if (parts.length != 3) {
+          throw new IllegalArgumentException(
+              "Expected 3 CSV columns at line " + line + " in " + inputCsvPath + ", found " + parts.length);
+        }
+
+        try {
+          long timestamp = Long.parseLong(parts[0].trim());
+          double f1 = Double.parseDouble(parts[1].trim());
+          double f2 = Double.parseDouble(parts[2].trim());
+          tuples.add(new Tuple(timestamp, f1, f2));
+        } catch (NumberFormatException e) {
+          throw new IllegalArgumentException("Invalid tuple values at line " + line + " in " + inputCsvPath, e);
+        }
+      }
+    } catch (IOException e) {
+      throw new IllegalArgumentException("Cannot read input CSV: " + inputCsvPath, e);
+    }
+    return tuples;
+  }
+
 }
