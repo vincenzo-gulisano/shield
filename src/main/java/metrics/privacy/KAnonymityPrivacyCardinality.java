@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
  */
 
 public class KAnonymityPrivacyCardinality
-        implements Distance<List<GenericEvent>> {
+        implements Distance<List<? extends DoubleFieldLookup>> {
 
     public static class StdDevStats {
         public double mean = 0.0;
@@ -40,7 +40,7 @@ public class KAnonymityPrivacyCardinality
     private final List<String> attributes;
 
     public KAnonymityPrivacyCardinality(
-            List<GenericEvent> originalStream, int k, List<String> attributes) {
+            List<? extends DoubleFieldLookup> originalStream, int k, List<String> attributes) {
 
         if (k < 2) {
             throw new IllegalArgumentException("k must be at least 2");
@@ -53,7 +53,7 @@ public class KAnonymityPrivacyCardinality
                 .collect(Collectors.toMap(
                         a -> a,
                         a -> originalStream.stream()
-                                .mapToDouble(e -> e.getAttribute(a))
+                                .mapToDouble(e -> e.lookup(a))
                                 .filter(v -> !Double.isNaN(v))
                                 .average()
                                 .orElse(0.0)
@@ -65,7 +65,7 @@ public class KAnonymityPrivacyCardinality
                         a -> a,
                         a -> {
                             List<Double> values = originalStream.stream()
-                                    .map(e -> e.getAttribute(a))
+                                    .map(e -> e.lookup(a))
                                     .filter(v -> !Double.isNaN(v))
                                     .collect(Collectors.toList());
                             if (values.size() < 2) return 1.0;
@@ -91,8 +91,8 @@ public class KAnonymityPrivacyCardinality
      * Return a single privacy score based on the mean standard deviation.
      */
     @Override
-    public Double apply(List<GenericEvent> original,
-                        List<GenericEvent> modified) {
+    public Double apply(List<? extends DoubleFieldLookup> original,
+                        List<? extends DoubleFieldLookup> modified) {
         if (modified == null) {
             return 0.0;
         }
@@ -107,7 +107,7 @@ public class KAnonymityPrivacyCardinality
     /**
      * Calculate the privacy score based on the 99° percentile of the standard deviation
      */
-    public Double applyWithQuantile99(List<GenericEvent> original, List<GenericEvent> modified) {
+    public Double applyWithQuantile99(List<? extends DoubleFieldLookup> original, List<? extends DoubleFieldLookup> modified) {
         if (modified == null) {
             return 0.0;
         }
@@ -120,7 +120,7 @@ public class KAnonymityPrivacyCardinality
     /**
      * Calculate the privacy score based on the maximum of the standard deviation
      */
-    public Double applyWithMax(List<GenericEvent> original, List<GenericEvent> modified) {
+    public Double applyWithMax(List<? extends DoubleFieldLookup> original, List<? extends DoubleFieldLookup> modified) {
         if (modified == null) {
             return 0.0;
         }
@@ -134,8 +134,8 @@ public class KAnonymityPrivacyCardinality
      * Computes statistics directly on the standard deviation of k-nearest-neighbor distances.
      */
     public StdDevStats applyWithStdDevStats(
-            List<GenericEvent> original,
-            List<GenericEvent> modified) {
+            List<? extends DoubleFieldLookup> original,
+            List<? extends DoubleFieldLookup> modified) {
 
         StdDevStats stats = new StdDevStats();
 
@@ -147,7 +147,7 @@ public class KAnonymityPrivacyCardinality
         // Collect raw standard deviation values for each event
         List<Double> stddevs = new ArrayList<>();
 
-        for (GenericEvent e : modified) {
+        for (DoubleFieldLookup e : modified) {
             double[] v = toVector(e);
             if (MetricUtils.isAllNaN(v)) continue;
 
@@ -191,7 +191,7 @@ public class KAnonymityPrivacyCardinality
         return stats;
     }
 
-    private double calculateCardinalityFactor(List<GenericEvent> original, List<GenericEvent> modified) {
+    private double calculateCardinalityFactor(List<? extends DoubleFieldLookup> original, List<? extends DoubleFieldLookup> modified) {
         if (original == null || modified == null) return 0.0;
         double nOrig = original.size();
         double nMod = modified.size();
@@ -202,11 +202,11 @@ public class KAnonymityPrivacyCardinality
     }
 
     // Converts a GenericEvent into a normalized feature vector
-    private double[] toVector(GenericEvent e) {
+    private double[] toVector(DoubleFieldLookup e) {
         double[] v = new double[this.attributes.size()];
         for (int i = 0; i < this.attributes.size(); i++) {
             String attrName = this.attributes.get(i);
-            double val = e.getAttribute(attrName);
+            double val = e.lookup(attrName);
             double inv = inverseStds.get(attrName);
             v[i] = Double.isNaN(val) ? Double.NaN : val * inv;
         }

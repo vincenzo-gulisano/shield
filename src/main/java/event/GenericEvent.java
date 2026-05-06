@@ -1,13 +1,14 @@
 package event;
 
 import common.tuple.BaseRichTuple;
+import metrics.privacy.DoubleFieldLookup;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 // GenericEvent represents a single event (tuple) in the stream
-public class GenericEvent extends BaseRichTuple {
+public class GenericEvent extends BaseRichTuple implements DoubleFieldLookup {
 
     public enum EventType {
         NORMAL,
@@ -74,5 +75,10 @@ public class GenericEvent extends BaseRichTuple {
                 .collect(Collectors.joining(", "));
         return String.format("Event{timestamp=%d, key=%s, type=%s, attributes={%s}}",
                 getTimestamp(), getKey(), eventType, attrs);
+    }
+
+    @Override
+    public double lookup(String fieldName) {
+        return getAttribute(fieldName);
     }
 }
