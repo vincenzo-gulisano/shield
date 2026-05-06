@@ -11,7 +11,6 @@ ea.experiment(
       );
       problem = anonym.problem.enhancedStreamAnonymizationProblem(
         inputCsvPath = "datasets/synthetic.forkjointest.csv";
-        grammarPath = "src/main/resources/grammars/forkjoin.synthetic/forkjoin.synthetic.all.bnf";
         privacyMetric = K_ANONYMITY_CARDINALITY_Q99
       )
     )
