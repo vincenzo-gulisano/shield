@@ -25,16 +25,21 @@ import java.util.TreeMap;
 import java.util.function.Function;
 import mappers.QueryMapper.Arc;
 import mappers.QueryMapper.OperatorRepresentation;
+import problem.utils.PrivacyMetricChoice;
 
 public class EnhancedStreamAnonymizationProblem implements
     SimpleMOProblem<Graph<OperatorRepresentation, Arc>, Double> {
+
+  public EnhancedStreamAnonymizationProblem(String inputCsvPath, PrivacyMetricChoice privacyMetric) {
+    // TODO implement the constructor
+
+  }
 
   private final static SequencedMap<String, Comparator<Double>> OBJECTIVES = new TreeMap<>(
       Map.ofEntries(
           Map.entry("privacy", ((Comparator<Double>) Double::compareTo).reversed()),
           Map.entry("results-similarity", ((Comparator<Double>) Double::compareTo).reversed()),
-          Map.entry("performance-similarity", ((Comparator<Double>) Double::compareTo).reversed())
-      ));
+          Map.entry("performance-similarity", ((Comparator<Double>) Double::compareTo).reversed())));
 
   @Override
   public SequencedMap<String, Comparator<Double>> comparators() {

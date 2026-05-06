@@ -39,22 +39,20 @@ public class ProblemBuilder {
             @Param("grammarPath") String grammarPath,
             @Param(value = "privacyMetric", dS = "K_ANONYMITY_CARDINALITY") PrivacyMetricChoice privacyMetric,
             @Param(value = "keyColumn", dS = "") String keyColumn,
-            @Param(value = "name", iS = "{inputCsvPath}") String name
-    ) throws Exception {
+            @Param(value = "name", iS = "{inputCsvPath}") String name) throws Exception {
         boolean isFilterOnly = grammarPath.toLowerCase().contains("filters");
         return new StreamAnonymizationProblem(inputCsvPath, keyColumn, privacyMetric, isFilterOnly);
     }
 
     @Cacheable
     public static EnhancedStreamAnonymizationProblem enhancedStreamAnonymizationProblem(
-        @Param("inputCsvPath") String inputCsvPath,
-        @Param(value = "privacyMetric", dS = "K_ANONYMITY_CARDINALITY") PrivacyMetricChoice privacyMetric,
-        @Param(value = "name", iS = "{inputCsvPath}") String name
-    ) {
-        // TODO actually create and return the problem object
-        throw new UnsupportedOperationException();
-    }
+            @Param("inputCsvPath") String inputCsvPath,
+            @Param(value = "privacyMetric", dS = "K_ANONYMITY_CARDINALITY") PrivacyMetricChoice privacyMetric,
+            @Param(value = "name", iS = "{inputCsvPath}") String name) {
 
+        // TODO add more parameters, e.g. to specify which ops to use without changing grammar
+        return new EnhancedStreamAnonymizationProblem(inputCsvPath, privacyMetric);
+    }
 
     // Create a problem with 3 objectives
     @SuppressWarnings("unused")
@@ -64,8 +62,7 @@ public class ProblemBuilder {
             @Param("grammarPath") String grammarPath,
             @Param(value = "privacyMetric", dS = "K_ANONYMITY_CARDINALITY") PrivacyMetricChoice privacyMetric,
             @Param(value = "keyColumn", dS = "") String keyColumn,
-            @Param(value = "name", iS = "{inputCsvPath}") String name
-    ) throws Exception {
+            @Param(value = "name", iS = "{inputCsvPath}") String name) throws Exception {
         boolean isFilterOnly = grammarPath.toLowerCase().contains("filters");
         return new StreamAnonymizationProblem(inputCsvPath, keyColumn, privacyMetric, isFilterOnly);
     }
@@ -78,8 +75,7 @@ public class ProblemBuilder {
             @Param("grammarPath") String grammarPath,
             @Param(value = "privacyMetric", dS = "K_ANONYMITY_CARDINALITY") PrivacyMetricChoice privacyMetric,
             @Param(value = "keyColumn", dS = "") String keyColumn,
-            @Param(value = "name", iS = "{inputCsvPath}") String name
-    ) throws Exception {
+            @Param(value = "name", iS = "{inputCsvPath}") String name) throws Exception {
         return new StreamAnonymizationProblem_2ObjectivesRes(inputCsvPath, keyColumn, privacyMetric);
     }
 
@@ -91,8 +87,7 @@ public class ProblemBuilder {
             @Param("grammarPath") String grammarPath,
             @Param(value = "privacyMetric", dS = "K_ANONYMITY_CARDINALITY") PrivacyMetricChoice privacyMetric,
             @Param(value = "keyColumn", dS = "") String keyColumn,
-            @Param(value = "name", iS = "{inputCsvPath}") String name
-    ) throws Exception {
+            @Param(value = "name", iS = "{inputCsvPath}") String name) throws Exception {
         boolean isFilterOnly = grammarPath.toLowerCase().contains("filters");
         return new StreamAnonymizationProblem_2ObjectivesPerf(inputCsvPath, keyColumn, privacyMetric, isFilterOnly);
     }
