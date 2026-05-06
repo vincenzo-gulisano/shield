@@ -16,6 +16,7 @@
 
 package problem;
 
+import io.github.ericmedvet.jgea.core.distance.Distance;
 import io.github.ericmedvet.jgea.core.problem.SimpleMOProblem;
 import io.github.ericmedvet.jgea.core.representation.graph.Graph;
 
@@ -40,15 +41,25 @@ import org.slf4j.LoggerFactory;
 import event.GenericEvent;
 import mappers.QueryMapper.Arc;
 import mappers.QueryMapper.OperatorRepresentation;
+import metrics.performance.PerformanceSimilarity;
+import metrics.performance.utils.StreamStatsWindow;
+import metrics.privacy.DoubleFieldLookup;
+import metrics.privacy.KAnonymityPrivacyCardinality;
+import metrics.results.F1Score;
 import problem.utils.PrivacyMetricChoice;
+import usecase.common.Tuple;
 import usecase.forkjoin.synthetic.MainQuery;
 import usecase.forkjoin.synthetic.MainQuery.QueryResult;
-import usecase.forkjoin.synthetic.Tuple;
 
 public class EnhancedStreamAnonymizationProblem implements
     SimpleMOProblem<Graph<OperatorRepresentation, Arc>, Double> {
 
   private static final Logger logger = LoggerFactory.getLogger(StreamAnonymizationProblem.class);
+
+  private final KAnonymityPrivacyCardinality privacyMetricCalculator;
+  private final Distance<StreamStatsWindow> fidelityMetricCalculator;
+  // private final Distance<List<? extends DoubleFieldLookup>>
+  // semanticsMetricCalculator;
 
   private final List<Tuple> inputTuples;
 
@@ -63,6 +74,14 @@ public class EnhancedStreamAnonymizationProblem implements
     QueryResult mainQueryResults = MainQuery.process(inputTuples, "main", minTs, maxTs);
     logger.info("Main query executed successfully, returning {} results, and the following metrics:\n{}",
         mainQueryResults.events().size(), mainQueryResults.statsWindow());
+
+    List<String> attributes = List.of(Tuple.getFieldNames(inputTuples.get(0).getNumFields()));
+    this.privacyMetricCalculator = new KAnonymityPrivacyCardinality(inputTuples, 50, attributes);
+    this.fidelityMetricCalculator = new PerformanceSimilarity(mainQueryResults.statsWindow(), true);
+    logger.info("Empty query privacy and fidelity scores: {} and {}",
+        privacyMetricCalculator.applyWithQuantile99(inputTuples, inputTuples),
+        fidelityMetricCalculator.apply(mainQueryResults.statsWindow(), mainQueryResults.statsWindow()));
+
   }
 
   private final static SequencedMap<String, Comparator<Double>> OBJECTIVES = new TreeMap<>(

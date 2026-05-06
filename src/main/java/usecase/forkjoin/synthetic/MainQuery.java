@@ -8,6 +8,7 @@ import component.source.Source;
 import component.source.SourceFunction;
 import metrics.performance.utils.StreamStatsWindow;
 import query.Query;
+import usecase.common.Tuple;
 
 import java.util.*;
 
@@ -42,14 +43,14 @@ public class MainQuery {
         Operator<Tuple, Tuple> b1f = query.addFilterOperator(
                 "b1f_" + queryId,
                 tuple -> {
-                    return (tuple.getF1() >= filter1min && tuple.getF1() <= filter1max);
+                    return (tuple.getField("f1") >= filter1min && tuple.getField("f1") <= filter1max);
                 });
 
         // Filter for branch 2
         Operator<Tuple, Tuple> b2f = query.addFilterOperator(
                 "b2f_" + queryId,
                 tuple -> {
-                    return (tuple.getF2() >= filter2min && tuple.getF2() <= filter2max);
+                    return (tuple.getField("f2") >= filter2min && tuple.getField("f2") <= filter2max);
                 });
 
         // Inner class for performance metric recording
