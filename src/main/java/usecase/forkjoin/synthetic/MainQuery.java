@@ -1,4 +1,4 @@
-package query;
+package usecase.forkjoin.synthetic;
 
 import common.util.Util;
 import component.operator.Operator;
@@ -6,17 +6,17 @@ import component.operator.in1.map.MapFunction;
 import component.sink.Sink;
 import component.source.Source;
 import component.source.SourceFunction;
-import event.GenericEvent;
 import metrics.performance.utils.StreamStatsWindow;
+import query.Query;
 
 import java.util.*;
 
-public class MainQueryForkJoinTest {
+public class MainQuery {
 
     // Record to contain the final results events and the collected performance metrics
-    public record QueryResult(List<GenericEvent> events, StreamStatsWindow statsWindow) implements MainQueryResult {}
+    public record QueryResult(List<Tuple> events, StreamStatsWindow statsWindow) {}
 
-    public static QueryResult process(List<GenericEvent> inputStream, String queryId, long minTs, long maxTs) {
+    public static QueryResult process(List<Tuple> inputStream, String queryId, long minTs, long maxTs) {
 
         final long resolution = 3000000L;  // 50 minutes
         final double filter1min = 4000.0;
@@ -29,31 +29,29 @@ public class MainQueryForkJoinTest {
                 Set.of("sourceStream", "branch1filter", "branch2filter"),
                 minTs, maxTs, resolution);
 
-        final List<GenericEvent> collectedEvents = Collections.synchronizedList(new ArrayList<>());
+        final List<Tuple> collectedEvents = Collections.synchronizedList(new ArrayList<>());
         Query query = new Query();
 
         // Create and add a source that reads from the provided in-memory list
-        SourceFunction<GenericEvent> collectionSource = createCollectionSource(inputStream);
-        Source<GenericEvent> inputSource = query.addBaseSource("I1_" + queryId, collectionSource);
+        SourceFunction<Tuple> collectionSource = createCollectionSource(inputStream);
+        Source<Tuple> inputSource = query.addBaseSource("I1_" + queryId, collectionSource);
 
         // Filter for branch 1
-        Operator<GenericEvent, GenericEvent> b1f = query.addFilterOperator(
+        Operator<Tuple, Tuple> b1f = query.addFilterOperator(
                 "b1f_" + queryId,
                 tuple -> {
-                    double f1 = tuple.getAttribute("f1");
-                    return (f1 >= filter1min && f1 <= filter1max);
+                    return (tuple.getF1() >= filter1min && tuple.getF1() <= filter1max);
                 });
 
         // Filter for branch 2
-        Operator<GenericEvent, GenericEvent> b2f = query.addFilterOperator(
+        Operator<Tuple, Tuple> b2f = query.addFilterOperator(
                 "b2f_" + queryId,
                 tuple -> {
-                    double f2 = tuple.getAttribute("f2");
-                    return (f2 >= filter2min && f2 <= filter2max);
+                    return (tuple.getF2() >= filter2min && tuple.getF2() <= filter2max);
                 });
 
         // Inner class for performance metric recording
-        class InnerPerformanceRecorder implements MapFunction<GenericEvent, GenericEvent> {
+        class InnerPerformanceRecorder implements MapFunction<Tuple, Tuple> {
             private final String streamId;
             private final StreamStatsWindow statsWindowLocal;
             private long currentPerformanceMetricTimestamp = -1L;
@@ -64,7 +62,7 @@ public class MainQueryForkJoinTest {
             }
 
             @Override
-            public GenericEvent apply(GenericEvent t) {
+            public Tuple apply(Tuple t) {
                 if (t != null) {
                     currentPerformanceMetricTimestamp = (t.getTimestamp() - statsWindowLocal.minTimestamp()) / statsWindowLocal.getResolutionMillis();
                     long alignedTs = statsWindowLocal.minTimestamp() + currentPerformanceMetricTimestamp * statsWindowLocal.getResolutionMillis();
@@ -77,18 +75,16 @@ public class MainQueryForkJoinTest {
         }
 
         // Create performance recorder operators for each stage
-        Operator<GenericEvent, GenericEvent> recorderAfterSource = query.addMapOperator("rec_s_" + queryId,
+        Operator<Tuple, Tuple> recorderAfterSource = query.addMapOperator("rec_s_" + queryId,
                 new InnerPerformanceRecorder("sourceStream", statsWindow));
-        Operator<GenericEvent, GenericEvent> recorderAfterBranch1 = query.addMapOperator("rec_b1_" + queryId,
+        Operator<Tuple, Tuple> recorderAfterBranch1 = query.addMapOperator("rec_b1_" + queryId,
                 new InnerPerformanceRecorder("branch1filter", statsWindow));
-        Operator<GenericEvent, GenericEvent> recorderAfterBranch2 = query.addMapOperator("rec_b2_" + queryId,
+        Operator<Tuple, Tuple> recorderAfterBranch2 = query.addMapOperator("rec_b2_" + queryId,
                 new InnerPerformanceRecorder("branch2filter", statsWindow));
 
         // Final Sink that adds every valid event to the results list
-        Sink<GenericEvent> sink = query.addBaseSink("o1_" + queryId, event -> {
-            if (event != null && event.getEventType() != GenericEvent.EventType.EMPTY_WINDOW) {
-                collectedEvents.add(event);
-            }
+        Sink<Tuple> sink = query.addBaseSink("o1_" + queryId, event -> {
+            collectedEvents.add(event);
         });
 
         // Connect the pipeline components
