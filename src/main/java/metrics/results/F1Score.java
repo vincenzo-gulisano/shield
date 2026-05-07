@@ -2,10 +2,11 @@ package metrics.results;
 
 import event.GenericEvent;
 import io.github.ericmedvet.jgea.core.distance.Distance;
+import usecase.common.Tuple;
 
 import java.util.*;
 
-public class F1Score implements Distance<List<GenericEvent>> {
+public class F1Score implements Distance<List<? extends Tuple>> {
 
     private final double percentageThreshold;
     private final List<String> valueAttributes;
@@ -24,16 +25,16 @@ public class F1Score implements Distance<List<GenericEvent>> {
      *  - all specified numeric attributes differ by no more than a fixed relative threshold
      */
     @Override
-    public Double apply(List<GenericEvent> groundTruth, List<GenericEvent> predictions) {
+    public Double apply(List<? extends Tuple> groundTruth, List<? extends Tuple> predictions) {
 
         if (groundTruth == null || predictions == null || predictions.isEmpty()) {
             return 0.0;
         }
 
         // Index ground truth events by (timestamp, key)
-        Map<String, List<GenericEvent>> gtIndex = new HashMap<>();
+        Map<String, List<Tuple>> gtIndex = new HashMap<>();
 
-        for (GenericEvent gt : groundTruth) {
+        for (Tuple gt : groundTruth) {
             String compositeKey = buildKey(gt);
             gtIndex.computeIfAbsent(compositeKey, k -> new ArrayList<>())
                     .add(gt);
@@ -41,19 +42,19 @@ public class F1Score implements Distance<List<GenericEvent>> {
         int truePositive = 0;
 
         // For each predicted event, attempt to find a matching ground truth event
-        for (GenericEvent pred : predictions) {
+        for (Tuple pred : predictions) {
             String compositeKey = buildKey(pred);
-            List<GenericEvent> candidates = gtIndex.get(compositeKey);
+            List<Tuple> candidates = gtIndex.get(compositeKey);
 
             // No ground truth events with same (timestamp, key)
             if (candidates == null || candidates.isEmpty()) {
                 continue;
             }
 
-            Iterator<GenericEvent> iterator = candidates.iterator();
+            Iterator<Tuple> iterator = candidates.iterator();
 
             while (iterator.hasNext()) {
-                GenericEvent gt = iterator.next();
+                Tuple gt = iterator.next();
 
                 // Check value similarity under relative tolerance
                 if (valuesAreSimilar(pred, gt)) {
@@ -83,7 +84,7 @@ public class F1Score implements Distance<List<GenericEvent>> {
     /**
      * Builds a composite key based on timestamp and logical key.
      */
-    private String buildKey(GenericEvent e) {
+    private String buildKey(Tuple e) {
         return e.getTimestamp() + "_" + e.getKey();
     }
 
@@ -94,12 +95,12 @@ public class F1Score implements Distance<List<GenericEvent>> {
      * The relative error is computed as:
      *      |gt - pred| / |gt|
      */
-    private boolean valuesAreSimilar(GenericEvent pred, GenericEvent gt) {
+    private boolean valuesAreSimilar(Tuple pred, Tuple gt) {
 
         for (String attr : valueAttributes) {
 
-            double predValue = pred.getAttribute(attr);
-            double gtValue = gt.getAttribute(attr);
+            double predValue = pred.lookup(attr);
+            double gtValue = gt.lookup(attr);
 
             // If either value is missing, events cannot match
             if (Double.isNaN(predValue) || Double.isNaN(gtValue)) {

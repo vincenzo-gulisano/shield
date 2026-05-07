@@ -41,7 +41,7 @@ public class StreamAnonymizationProblem_2ObjectivesRes implements SimpleMOProble
                     Map.entry("results-similarity", ((Comparator<Double>) Double::compareTo).reversed())
             ));
 
-    private final Distance<List<GenericEvent>> RESULTS_SIMILARITY;
+    private final F1Score RESULTS_SIMILARITY;
 
     private final KAnonymityPrivacyCardinality K_ANONYMITY_PRIVACY_CARDINALITY;
 

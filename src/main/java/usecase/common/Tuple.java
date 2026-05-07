@@ -13,6 +13,16 @@ public class Tuple extends BaseRichTuple implements DoubleFieldLookup {
         return IntStream.rangeClosed(1, numFields).mapToObj(i -> "f" + i).toArray(String[]::new);
     }
 
+    public Tuple(long stimulus, long timestamp, String key, double... fs) {
+        super(stimulus, timestamp, key);
+        this.fs = fs;
+    }
+
+    public Tuple(long timestamp, String key, double... fs) {
+        super(timestamp, key);
+        this.fs = fs;
+    }
+
     public Tuple(long timestamp, double... fs) {
         super(timestamp, "");
         this.fs = fs;

@@ -44,7 +44,7 @@ public class StreamAnonymizationProblem implements SimpleMOProblem<QueryRepresen
                     Map.entry("performance-similarity", ((Comparator<Double>) Double::compareTo).reversed())
             ));
 
-    private final Distance<List<GenericEvent>> RESULTS_SIMILARITY;
+    private final F1Score RESULTS_SIMILARITY;
     private final Distance<StreamStatsWindow> PERFORMANCE_SIMILARITY;
 
     private final KAnonymityPrivacyCardinality K_ANONYMITY_PRIVACY_CARDINALITY;

@@ -2,13 +2,14 @@ package event;
 
 import common.tuple.BaseRichTuple;
 import metrics.privacy.DoubleFieldLookup;
+import usecase.common.Tuple;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 // GenericEvent represents a single event (tuple) in the stream
-public class GenericEvent extends BaseRichTuple implements DoubleFieldLookup {
+public class GenericEvent extends Tuple {
 
     public enum EventType {
         NORMAL,

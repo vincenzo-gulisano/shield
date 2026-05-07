@@ -58,8 +58,7 @@ public class EnhancedStreamAnonymizationProblem implements
 
   private final KAnonymityPrivacyCardinality privacyMetricCalculator;
   private final Distance<StreamStatsWindow> fidelityMetricCalculator;
-  // private final Distance<List<? extends DoubleFieldLookup>>
-  // semanticsMetricCalculator;
+  private final F1Score semanticsMetricCalculator;
 
   private final List<Tuple> inputTuples;
 
@@ -78,9 +77,12 @@ public class EnhancedStreamAnonymizationProblem implements
     List<String> attributes = List.of(Tuple.getFieldNames(inputTuples.get(0).getNumFields()));
     this.privacyMetricCalculator = new KAnonymityPrivacyCardinality(inputTuples, 50, attributes);
     this.fidelityMetricCalculator = new PerformanceSimilarity(mainQueryResults.statsWindow(), true);
-    logger.info("Empty query privacy and fidelity scores: {} and {}",
+    this.semanticsMetricCalculator = new F1Score(0.1, attributes);
+    
+    logger.info("Empty query privacy, fidelity, and semantics scores: {}, {}, and {}",
         privacyMetricCalculator.applyWithQuantile99(inputTuples, inputTuples),
-        fidelityMetricCalculator.apply(mainQueryResults.statsWindow(), mainQueryResults.statsWindow()));
+        fidelityMetricCalculator.apply(mainQueryResults.statsWindow(), mainQueryResults.statsWindow()),
+        semanticsMetricCalculator.apply(mainQueryResults.events(), mainQueryResults.events()));
 
   }
 
