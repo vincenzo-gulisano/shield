@@ -59,7 +59,8 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
       OperatorRepresentation sinkNode = new SimpleOperatorStep("Sink");
       g.addNode(sinkNode);
       g.setArcValue(finalNode, sinkNode, Arc.DEFAULT_ARC);
-      logger.info("Resulting graph:\n{}\n",prettyPrintGraph(g));
+      // logger.info("Input tree:\n{}\n", prettyPrintTree(tree));
+      // logger.info("Resulting graph:\n{}\n",prettyPrintGraph(g));
       return g;
     };
   }
@@ -196,6 +197,45 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
 
   public enum Arc {
     DEFAULT_ARC
+  }
+
+  public static String prettyPrintTree(Tree<String> tree) {
+    StringBuilder sb = new StringBuilder("\n");
+    appendTreeOperators(sb, tree, 0);
+    return sb.append('\n').toString();
+  }
+
+  private static void appendTreeOperators(StringBuilder sb, Tree<String> node, int level) {
+    String content = node.content();
+    if (content.equals("<pipeline>") || content.equals("<operator>")) {
+      for (Tree<String> child : node) {
+        appendTreeOperators(sb, child, level);
+      }
+      return;
+    }
+
+    if (isOperatorNode(content)) {
+      sb.append("\t".repeat(level)).append(operatorName(content)).append('\n');
+      if (content.equals("<fork_ops_join>")) {
+        for (int i = 0; i < node.nChildren(); i++) {
+          if (i > 0) {
+            sb.append('\n');
+          }
+          appendTreeOperators(sb, node.child(i), level + 1);
+        }
+      }
+    }
+  }
+
+  private static boolean isOperatorNode(String content) {
+    return switch (content) {
+      case "<filter>", "<map_duplicate>", "<map_noise>", "<map_rir>", "<map_aggregate>", "<fork_ops_join>" -> true;
+      default -> false;
+    };
+  }
+
+  private static String operatorName(String content) {
+    return content.substring(1, content.length() - 1);
   }
 
   public static String prettyPrintGraph(Graph<OperatorRepresentation, Arc> graph) {
