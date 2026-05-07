@@ -16,21 +16,26 @@
 
 package mappers;
 
-import static mappers.utils.TreeUtils.findFirstTerminal;
-
 import io.github.ericmedvet.jgea.core.InvertibleMapper;
 import io.github.ericmedvet.jgea.core.representation.graph.Graph;
 import io.github.ericmedvet.jgea.core.representation.graph.LinkedHashGraph;
 import io.github.ericmedvet.jgea.core.representation.tree.Tree;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Function;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import mappers.QueryMapper.Arc;
 import mappers.QueryMapper.OperatorRepresentation;
-import mappers.QueryRepresentation.OperatorNode;
 
 public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<OperatorRepresentation, Arc>> {
+
+  private static final Logger logger = LoggerFactory.getLogger(QueryMapper.class);
 
   @Override
   public Tree<String> exampleFor(
@@ -47,13 +52,16 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
       Graph<OperatorRepresentation, Arc> g = new LinkedHashGraph<>();
       OperatorRepresentation sourceNode = new SimpleOperatorStep("Source");
       g.addNode(sourceNode);
-      parsePipelineNode(tree, sourceNode, g);
-      // g.setArcValue(null, null, Arc.DEFAULT_ARC);
+      OperatorRepresentation finalNode = parsePipelineNode(tree, sourceNode, g);
+      OperatorRepresentation sinkNode = new SimpleOperatorStep("Sink");
+      g.addNode(sinkNode);
+      g.setArcValue(finalNode, sinkNode, Arc.DEFAULT_ARC);
+      logger.info("Resulting graph:\n{}\n",prettyPrint(g));
       return g;
     };
   }
 
-  private void parsePipelineNode(Tree<String> pipelineNode, OperatorRepresentation previousNode,
+  private OperatorRepresentation parsePipelineNode(Tree<String> pipelineNode, OperatorRepresentation previousNode,
       Graph<OperatorRepresentation, Arc> g) {
 
     if (previousNode == null) {
@@ -78,55 +86,52 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
       throw new IllegalArgumentException("The second child of a <pipeline> node must be a <pipeline> node");
     }
 
-    OperatorRepresentation step = parseOperatorNode(operatorNode);
+    OperatorRepresentation step = parseOperatorNode(operatorNode, previousNode, g);
     if (step == null) {
       throw new IllegalArgumentException("Failed to parse <operator> node in the grammar tree");
     }
-    g.addNode(step);
-    g.setArcValue(previousNode, step, Arc.DEFAULT_ARC);
+    // g.addNode(step);
+    // g.setArcValue(previousNode, step, Arc.DEFAULT_ARC);
+    // previousNode = step;
 
     if (nextPipelineNode != null) {
-      parsePipelineNode(nextPipelineNode, step, g);
+      return parsePipelineNode(nextPipelineNode, step, g);
     }
 
-    // return steps;
+    return step;
+
   }
 
-  private List<OperatorRepresentation> parsePipelineNode(Tree<String> pipelineNode) {
-    List<OperatorRepresentation> steps = new ArrayList<>();
-    Tree<String> currentNode = pipelineNode;
-    while (currentNode != null) {
-      if (currentNode.nChildren() > 2) {
-        throw new IllegalArgumentException(
-            "A <pipeline> node can have at most 2 children: an <operator> and an optional <pipeline>");
-      }
-      Tree<String> operatorNode = currentNode.child(0);
-      if (!operatorNode.content().equals("<operator>")) {
-        throw new IllegalArgumentException("The first child of a <pipeline> node must be an <operator> node");
-      }
-      steps.add(parseOperatorNode(operatorNode));
-
-      currentNode = currentNode.nChildren() > 1 ? currentNode.child(1) : null;
-      if (currentNode != null && !currentNode.content().equals("<pipeline>")) {
-        throw new IllegalArgumentException("The second child of a <pipeline> node must be a <pipeline> node");
-      }
-    }
-    return steps;
-  }
-
-  private OperatorRepresentation parseOperatorNode(Tree<String> operatorNode) {
+  private OperatorRepresentation parseOperatorNode(Tree<String> operatorNode, OperatorRepresentation previousNode,
+      Graph<OperatorRepresentation, Arc> g) {
     Tree<String> specificOpNode = operatorNode.child(0);
 
     return switch (specificOpNode.content()) {
-      case "<filter>" -> new SimpleOperatorStep(parseFilterNode(specificOpNode));
-      case "<map_duplicate>" -> new SimpleOperatorStep(parseMapDuplicateNode(specificOpNode));
-      case "<map_noise>" -> new SimpleOperatorStep(parseMapNoiseNode(specificOpNode));
-      case "<map_rir>" -> new SimpleOperatorStep(parseMapRIRNode(specificOpNode));
-      case "<map_aggregate>" -> new SimpleOperatorStep(parseMapAggregateNode(specificOpNode));
-      case "<fork_ops_join>" -> parseForkJoinNode(specificOpNode);
+      case "<filter>" ->
+        addSimpleOperatorStepToGraph(new SimpleOperatorStep(parseFilterNode(specificOpNode)), previousNode, g);
+      case "<map_duplicate>" ->
+        addSimpleOperatorStepToGraph(new SimpleOperatorStep(parseMapDuplicateNode(specificOpNode)), previousNode, g);
+      case "<map_noise>" ->
+        addSimpleOperatorStepToGraph(new SimpleOperatorStep(parseMapNoiseNode(specificOpNode)), previousNode, g);
+      case "<map_rir>" ->
+        addSimpleOperatorStepToGraph(new SimpleOperatorStep(parseMapRIRNode(specificOpNode)), previousNode, g);
+      case "<map_aggregate>" ->
+        addSimpleOperatorStepToGraph(new SimpleOperatorStep(parseMapAggregateNode(specificOpNode)), previousNode, g);
+      case "<fork_ops_join>" -> parseForkJoinNode(specificOpNode, previousNode, g);
       default ->
         throw new IllegalArgumentException("Unknown operator type found in grammar tree: " + specificOpNode.content());
     };
+  }
+
+  private OperatorRepresentation addSimpleOperatorStepToGraph(SimpleOperatorStep step,
+      OperatorRepresentation previousNode, Graph<OperatorRepresentation, Arc> g) {
+    g.addNode(step);
+    if (previousNode == null) {
+      throw new IllegalArgumentException(
+          "Previous node cannot be null when adding a simple operator step to the graph");
+    }
+    g.setArcValue(previousNode, step, Arc.DEFAULT_ARC);
+    return step;
   }
 
   private String parseFilterNode(Tree<String> specificOpNode) {
@@ -138,21 +143,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
   }
 
   private String parseMapNoiseNode(Tree<String> specificOpNode) {
-    String attribute = null;
-    String percentageString = null;
-    for (Tree<String> child : specificOpNode) {
-      switch (child.content()) {
-        case "<attribute>" -> attribute = findFirstTerminal(child);
-        case "<percentage>" -> percentageString = findFirstTerminal(child);
-        default -> {
-        }
-      }
-    }
-    if (attribute == null || percentageString == null) {
-      throw new IllegalArgumentException("A <map_noise> node must contain <attribute> and <percentage> children");
-    }
-    double percentage = Double.parseDouble(percentageString);
-    return String.format("MapNoise(attribute=%s, percentage=%.2f)", attribute.replace("'", ""), percentage);
+    return "MapNoise()";
   }
 
   private String parseMapRIRNode(Tree<String> specificOpNode) {
@@ -163,7 +154,8 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     return "MapAggregate()";
   }
 
-  private OperatorRepresentation parseForkJoinNode(Tree<String> specificOpNode) {
+  private OperatorRepresentation parseForkJoinNode(Tree<String> specificOpNode,
+      OperatorRepresentation previousNode, Graph<OperatorRepresentation, Arc> g) {
     if (specificOpNode.nChildren() != 2) {
       throw new IllegalArgumentException(
           "A <fork_ops_join> node must have exactly 2 children, representing the two branches of the fork");
@@ -176,41 +168,128 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     Tree<String> leftPipelineNode = specificOpNode.child(0);
     Tree<String> rightPipelineNode = specificOpNode.child(1);
 
-    List<OperatorRepresentation> leftBranch = parsePipelineNode(leftPipelineNode);
-    List<OperatorRepresentation> rightBranch = parsePipelineNode(rightPipelineNode);
+    SimpleOperatorStep forkOp = new SimpleOperatorStep("FORK");
+    g.addNode(forkOp);
+    g.setArcValue(previousNode, forkOp, Arc.DEFAULT_ARC);
 
-    return new ForkJoinStep(leftBranch, rightBranch);
+    OperatorRepresentation leftBranch = parsePipelineNode(leftPipelineNode,forkOp, g);
+    OperatorRepresentation rightBranch = parsePipelineNode(rightPipelineNode,forkOp, g);
+
+    SimpleOperatorStep joinOp = new SimpleOperatorStep("JOIN");
+    g.addNode(joinOp);
+    g.setArcValue(leftBranch, joinOp, Arc.DEFAULT_ARC);
+    g.setArcValue(rightBranch, joinOp, Arc.DEFAULT_ARC);
+    
+    return joinOp;
+
+    // return new ForkJoinStep(leftBranch, rightBranch);
   }
 
   public enum Arc {
     DEFAULT_ARC
   }
 
+  public static String prettyPrint(Graph<OperatorRepresentation, Arc> graph) {
+    List<OperatorRepresentation> roots = graph.nodes().stream()
+        .filter(node -> graph.predecessors(node).isEmpty())
+        .toList();
+    if (roots.isEmpty()) {
+      roots = new ArrayList<>(graph.nodes());
+    }
+
+    List<StringBuilder> lines = new ArrayList<>();
+    for (int i = 0; i < roots.size(); i++) {
+      if (i > 0) {
+        lines.add(new StringBuilder());
+      }
+      StringBuilder line = new StringBuilder();
+      lines.add(line);
+      appendHorizontalPath(line, lines, graph, roots.get(i), new HashSet<>(), false);
+    }
+
+    StringBuilder sb = new StringBuilder("\n");
+    for (StringBuilder line : lines) {
+      sb.append(line).append('\n');
+    }
+    return sb.append('\n').toString();
+  }
+
+  private static void appendHorizontalPath(StringBuilder line, List<StringBuilder> lines,
+      Graph<OperatorRepresentation, Arc> graph, OperatorRepresentation firstNode, Set<OperatorRepresentation> path,
+      boolean stopAtJoin) {
+    OperatorRepresentation node = firstNode;
+    while (node != null) {
+      line.append(node.getRepresentation());
+      if (!path.add(node)) {
+        line.append(" (cycle)");
+        return;
+      }
+      if (stopAtJoin && graph.predecessors(node).size() > 1) {
+        return;
+      }
+
+      List<OperatorRepresentation> successors = new ArrayList<>(graph.successors(node));
+      if (successors.isEmpty()) {
+        return;
+      }
+
+      if (successors.size() > 1) {
+        int branchIndent = line.length() + 4;
+        for (int i = 1; i < successors.size(); i++) {
+          StringBuilder branchLine = new StringBuilder();
+          appendSpaces(branchLine, branchIndent);
+          branchLine.append("\\_ ");
+          lines.add(branchLine);
+          appendHorizontalPath(branchLine, lines, graph, successors.get(i), new HashSet<>(path), true);
+        }
+      }
+
+      line.append(" -- ");
+      node = successors.get(0);
+    }
+  }
+
+  private static void appendSpaces(StringBuilder sb, int n) {
+    for (int i = 0; i < n; i++) {
+      sb.append(' ');
+    }
+  }
+
   public interface OperatorRepresentation {
     public String getRepresentation();
   }
 
-  record SimpleOperatorStep(String representation)
-      implements OperatorRepresentation {
+  private static final class SimpleOperatorStep implements OperatorRepresentation {
+
+    private final String representation;
+
+    private SimpleOperatorStep(String representation) {
+      this.representation = representation;
+    }
 
     @Override
     public String getRepresentation() {
       return representation;
     }
-  }
-
-  record ForkJoinStep(
-      List<OperatorRepresentation> leftBranch,
-      List<OperatorRepresentation> rightBranch) implements OperatorRepresentation {
 
     @Override
-    public String getRepresentation() {
-      return "ForkJoin("
-          + leftBranch.stream().map(OperatorRepresentation::getRepresentation).reduce((a, b) -> a + "," + b).orElse("")
-          + " | "
-          + rightBranch.stream().map(OperatorRepresentation::getRepresentation).reduce((a, b) -> a + "," + b).orElse("")
-          + ")";
+    public final String toString() {
+        return representation;
     }
   }
+
+  // record ForkJoinStep(
+  //     List<OperatorRepresentation> leftBranch,
+  //     List<OperatorRepresentation> rightBranch) implements OperatorRepresentation {
+
+  //   @Override
+  //   public String getRepresentation() {
+  //     return "ForkJoin("
+  //         + leftBranch.stream().map(OperatorRepresentation::getRepresentation).reduce((a, b) -> a + "," + b).orElse("")
+  //         + " | "
+  //         + rightBranch.stream().map(OperatorRepresentation::getRepresentation).reduce((a, b) -> a + "," + b).orElse("")
+  //         + ")";
+  //   }
+  // }
 
 }

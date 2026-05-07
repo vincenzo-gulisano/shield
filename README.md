@@ -174,3 +174,18 @@ java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 10 -f expe
 * `-nt 10` — (Concurrency) Sets the number of threads for parallel fitness evaluations (e.g., 10).
 
 * `-v` — (Verbose) Enables detailed output and progress information in the console.
+
+##### If you want to debug:
+
+* `java -agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=localhost:5005 -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 10 -f synthetic.forkjoin.txt`
+
+* Modify the launch.json (VS Code) and add
+```
+        {
+            "type": "java",
+            "name": "Attach to Shield",
+            "request": "attach",
+            "hostName": "localhost",
+            "port": 5005
+        }
+```

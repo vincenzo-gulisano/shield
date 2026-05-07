@@ -7,7 +7,7 @@ ea.experiment(
         stop = ea.sc.nOfQualityEvaluations(n = 500);
         representation = ea.r.cfgTree(grammar = ea.grammar.fromFile(
             path = "src/main/resources/grammars/forkjoin.synthetic/forkjoin.synthetic.all.bnf"));
-        mapper = anonym.mapper.treeToQueryMapper()
+        mapper = anonym.mapper.queryMapper()
       );
       problem = anonym.problem.enhancedStreamAnonymizationProblem(
         inputCsvPath = "datasets/synthetic.forkjointest.csv";
