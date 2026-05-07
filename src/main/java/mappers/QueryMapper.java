@@ -22,8 +22,10 @@ import io.github.ericmedvet.jgea.core.representation.graph.LinkedHashGraph;
 import io.github.ericmedvet.jgea.core.representation.tree.Tree;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 
@@ -50,9 +52,10 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
 
       // TODO build the graph by adding nodes and parsing the tree
       Graph<OperatorRepresentation, Arc> g = new LinkedHashGraph<>();
+      Map<String, Integer> operatorCounters = new HashMap<>();
       OperatorRepresentation sourceNode = new SimpleOperatorStep("Source");
       g.addNode(sourceNode);
-      OperatorRepresentation finalNode = parsePipelineNode(tree, sourceNode, g);
+      OperatorRepresentation finalNode = parsePipelineNode(tree, sourceNode, g, operatorCounters);
       OperatorRepresentation sinkNode = new SimpleOperatorStep("Sink");
       g.addNode(sinkNode);
       g.setArcValue(finalNode, sinkNode, Arc.DEFAULT_ARC);
@@ -62,7 +65,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
   }
 
   private OperatorRepresentation parsePipelineNode(Tree<String> pipelineNode, OperatorRepresentation previousNode,
-      Graph<OperatorRepresentation, Arc> g) {
+      Graph<OperatorRepresentation, Arc> g, Map<String, Integer> operatorCounters) {
 
     if (previousNode == null) {
       throw new IllegalArgumentException("Previous node cannot be null when parsing a <pipeline> node");
@@ -86,7 +89,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
       throw new IllegalArgumentException("The second child of a <pipeline> node must be a <pipeline> node");
     }
 
-    OperatorRepresentation step = parseOperatorNode(operatorNode, previousNode, g);
+    OperatorRepresentation step = parseOperatorNode(operatorNode, previousNode, g, operatorCounters);
     if (step == null) {
       throw new IllegalArgumentException("Failed to parse <operator> node in the grammar tree");
     }
@@ -95,7 +98,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     // previousNode = step;
 
     if (nextPipelineNode != null) {
-      return parsePipelineNode(nextPipelineNode, step, g);
+      return parsePipelineNode(nextPipelineNode, step, g, operatorCounters);
     }
 
     return step;
@@ -103,24 +106,31 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
   }
 
   private OperatorRepresentation parseOperatorNode(Tree<String> operatorNode, OperatorRepresentation previousNode,
-      Graph<OperatorRepresentation, Arc> g) {
+      Graph<OperatorRepresentation, Arc> g, Map<String, Integer> operatorCounters) {
     Tree<String> specificOpNode = operatorNode.child(0);
 
     return switch (specificOpNode.content()) {
       case "<filter>" ->
-        addSimpleOperatorStepToGraph(new SimpleOperatorStep(parseFilterNode(specificOpNode)), previousNode, g);
+        addSimpleOperatorStepToGraph(new SimpleOperatorStep(numberedRepresentation(parseFilterNode(specificOpNode), operatorCounters)), previousNode, g);
       case "<map_duplicate>" ->
-        addSimpleOperatorStepToGraph(new SimpleOperatorStep(parseMapDuplicateNode(specificOpNode)), previousNode, g);
+        addSimpleOperatorStepToGraph(new SimpleOperatorStep(numberedRepresentation(parseMapDuplicateNode(specificOpNode), operatorCounters)), previousNode, g);
       case "<map_noise>" ->
-        addSimpleOperatorStepToGraph(new SimpleOperatorStep(parseMapNoiseNode(specificOpNode)), previousNode, g);
+        addSimpleOperatorStepToGraph(new SimpleOperatorStep(numberedRepresentation(parseMapNoiseNode(specificOpNode), operatorCounters)), previousNode, g);
       case "<map_rir>" ->
-        addSimpleOperatorStepToGraph(new SimpleOperatorStep(parseMapRIRNode(specificOpNode)), previousNode, g);
+        addSimpleOperatorStepToGraph(new SimpleOperatorStep(numberedRepresentation(parseMapRIRNode(specificOpNode), operatorCounters)), previousNode, g);
       case "<map_aggregate>" ->
-        addSimpleOperatorStepToGraph(new SimpleOperatorStep(parseMapAggregateNode(specificOpNode)), previousNode, g);
-      case "<fork_ops_join>" -> parseForkJoinNode(specificOpNode, previousNode, g);
+        addSimpleOperatorStepToGraph(new SimpleOperatorStep(numberedRepresentation(parseMapAggregateNode(specificOpNode), operatorCounters)), previousNode, g);
+      case "<fork_ops_join>" -> parseForkJoinNode(specificOpNode, previousNode, g, operatorCounters);
       default ->
         throw new IllegalArgumentException("Unknown operator type found in grammar tree: " + specificOpNode.content());
     };
+  }
+
+  private static String numberedRepresentation(String representation, Map<String, Integer> operatorCounters) {
+    int parenthesisIndex = representation.indexOf('(');
+    String operatorName = parenthesisIndex >= 0 ? representation.substring(0, parenthesisIndex) : representation;
+    int n = operatorCounters.merge(operatorName, 1, Integer::sum);
+    return operatorName + "(" + n + ")";
   }
 
   private OperatorRepresentation addSimpleOperatorStepToGraph(SimpleOperatorStep step,
@@ -155,7 +165,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
   }
 
   private OperatorRepresentation parseForkJoinNode(Tree<String> specificOpNode,
-      OperatorRepresentation previousNode, Graph<OperatorRepresentation, Arc> g) {
+      OperatorRepresentation previousNode, Graph<OperatorRepresentation, Arc> g, Map<String, Integer> operatorCounters) {
     if (specificOpNode.nChildren() != 2) {
       throw new IllegalArgumentException(
           "A <fork_ops_join> node must have exactly 2 children, representing the two branches of the fork");
@@ -168,14 +178,14 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     Tree<String> leftPipelineNode = specificOpNode.child(0);
     Tree<String> rightPipelineNode = specificOpNode.child(1);
 
-    SimpleOperatorStep forkOp = new SimpleOperatorStep("FORK");
+    SimpleOperatorStep forkOp = new SimpleOperatorStep(numberedRepresentation("FORK", operatorCounters));
     g.addNode(forkOp);
     g.setArcValue(previousNode, forkOp, Arc.DEFAULT_ARC);
 
-    OperatorRepresentation leftBranch = parsePipelineNode(leftPipelineNode,forkOp, g);
-    OperatorRepresentation rightBranch = parsePipelineNode(rightPipelineNode,forkOp, g);
+    OperatorRepresentation leftBranch = parsePipelineNode(leftPipelineNode,forkOp, g, operatorCounters);
+    OperatorRepresentation rightBranch = parsePipelineNode(rightPipelineNode,forkOp, g, operatorCounters);
 
-    SimpleOperatorStep joinOp = new SimpleOperatorStep("JOIN");
+    SimpleOperatorStep joinOp = new SimpleOperatorStep(numberedRepresentation("JOIN", operatorCounters));
     g.addNode(joinOp);
     g.setArcValue(leftBranch, joinOp, Arc.DEFAULT_ARC);
     g.setArcValue(rightBranch, joinOp, Arc.DEFAULT_ARC);
@@ -259,13 +269,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     public String getRepresentation();
   }
 
-  private static final class SimpleOperatorStep implements OperatorRepresentation {
-
-    private final String representation;
-
-    private SimpleOperatorStep(String representation) {
-      this.representation = representation;
-    }
+  record SimpleOperatorStep(String representation) implements OperatorRepresentation {
 
     @Override
     public String getRepresentation() {
