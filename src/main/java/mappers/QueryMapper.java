@@ -59,7 +59,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
       OperatorRepresentation sinkNode = new SimpleOperatorStep("Sink");
       g.addNode(sinkNode);
       g.setArcValue(finalNode, sinkNode, Arc.DEFAULT_ARC);
-      logger.info("Resulting graph:\n{}\n",prettyPrint(g));
+      logger.info("Resulting graph:\n{}\n",prettyPrintGraph(g));
       return g;
     };
   }
@@ -192,77 +192,19 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     
     return joinOp;
 
-    // return new ForkJoinStep(leftBranch, rightBranch);
   }
 
   public enum Arc {
     DEFAULT_ARC
   }
 
-  public static String prettyPrint(Graph<OperatorRepresentation, Arc> graph) {
-    List<OperatorRepresentation> roots = graph.nodes().stream()
-        .filter(node -> graph.predecessors(node).isEmpty())
-        .toList();
-    if (roots.isEmpty()) {
-      roots = new ArrayList<>(graph.nodes());
-    }
-
-    List<StringBuilder> lines = new ArrayList<>();
-    for (int i = 0; i < roots.size(); i++) {
-      if (i > 0) {
-        lines.add(new StringBuilder());
-      }
-      StringBuilder line = new StringBuilder();
-      lines.add(line);
-      appendHorizontalPath(line, lines, graph, roots.get(i), new HashSet<>(), false);
-    }
+  public static String prettyPrintGraph(Graph<OperatorRepresentation, Arc> graph) {
 
     StringBuilder sb = new StringBuilder("\n");
-    for (StringBuilder line : lines) {
-      sb.append(line).append('\n');
+    for ( Graph.Arc<OperatorRepresentation> arc : graph.arcs()) {
+      sb.append(arc).append('\n');
     }
-    return sb.append('\n').toString();
-  }
-
-  private static void appendHorizontalPath(StringBuilder line, List<StringBuilder> lines,
-      Graph<OperatorRepresentation, Arc> graph, OperatorRepresentation firstNode, Set<OperatorRepresentation> path,
-      boolean stopAtJoin) {
-    OperatorRepresentation node = firstNode;
-    while (node != null) {
-      line.append(node.getRepresentation());
-      if (!path.add(node)) {
-        line.append(" (cycle)");
-        return;
-      }
-      if (stopAtJoin && graph.predecessors(node).size() > 1) {
-        return;
-      }
-
-      List<OperatorRepresentation> successors = new ArrayList<>(graph.successors(node));
-      if (successors.isEmpty()) {
-        return;
-      }
-
-      if (successors.size() > 1) {
-        int branchIndent = line.length() + 4;
-        for (int i = 1; i < successors.size(); i++) {
-          StringBuilder branchLine = new StringBuilder();
-          appendSpaces(branchLine, branchIndent);
-          branchLine.append("\\_ ");
-          lines.add(branchLine);
-          appendHorizontalPath(branchLine, lines, graph, successors.get(i), new HashSet<>(path), true);
-        }
-      }
-
-      line.append(" -- ");
-      node = successors.get(0);
-    }
-  }
-
-  private static void appendSpaces(StringBuilder sb, int n) {
-    for (int i = 0; i < n; i++) {
-      sb.append(' ');
-    }
+    return sb.toString();
   }
 
   public interface OperatorRepresentation {
@@ -281,19 +223,5 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
         return representation;
     }
   }
-
-  // record ForkJoinStep(
-  //     List<OperatorRepresentation> leftBranch,
-  //     List<OperatorRepresentation> rightBranch) implements OperatorRepresentation {
-
-  //   @Override
-  //   public String getRepresentation() {
-  //     return "ForkJoin("
-  //         + leftBranch.stream().map(OperatorRepresentation::getRepresentation).reduce((a, b) -> a + "," + b).orElse("")
-  //         + " | "
-  //         + rightBranch.stream().map(OperatorRepresentation::getRepresentation).reduce((a, b) -> a + "," + b).orElse("")
-  //         + ")";
-  //   }
-  // }
 
 }
