@@ -21,12 +21,8 @@ import io.github.ericmedvet.jgea.core.representation.graph.Graph;
 import io.github.ericmedvet.jgea.core.representation.graph.LinkedHashGraph;
 import io.github.ericmedvet.jgea.core.representation.tree.Tree;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Function;
 
 import org.slf4j.Logger;
@@ -59,8 +55,8 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
       OperatorRepresentation sinkNode = new SimpleOperatorStep("Sink");
       g.addNode(sinkNode);
       g.setArcValue(finalNode, sinkNode, Arc.DEFAULT_ARC);
-      // logger.info("Input tree:\n{}\n", prettyPrintTree(tree));
-      // logger.info("Resulting graph:\n{}\n",prettyPrintGraph(g));
+      logger.info("Input tree:\n{}\n", prettyPrintTree(tree));
+      logger.info("Resulting graph:\n{}\n",prettyPrintGraph(g));
       return g;
     };
   }
@@ -110,29 +106,53 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
       Graph<OperatorRepresentation, Arc> g, Map<String, Integer> operatorCounters) {
     Tree<String> specificOpNode = operatorNode.child(0);
 
-    return switch (specificOpNode.content()) {
-      case "<filter>" ->
-        addSimpleOperatorStepToGraph(new SimpleOperatorStep(numberedRepresentation(parseFilterNode(specificOpNode), operatorCounters)), previousNode, g);
-      case "<map_duplicate>" ->
-        addSimpleOperatorStepToGraph(new SimpleOperatorStep(numberedRepresentation(parseMapDuplicateNode(specificOpNode), operatorCounters)), previousNode, g);
-      case "<map_noise>" ->
-        addSimpleOperatorStepToGraph(new SimpleOperatorStep(numberedRepresentation(parseMapNoiseNode(specificOpNode), operatorCounters)), previousNode, g);
-      case "<map_rir>" ->
-        addSimpleOperatorStepToGraph(new SimpleOperatorStep(numberedRepresentation(parseMapRIRNode(specificOpNode), operatorCounters)), previousNode, g);
-      case "<map_aggregate>" ->
-        addSimpleOperatorStepToGraph(new SimpleOperatorStep(numberedRepresentation(parseMapAggregateNode(specificOpNode), operatorCounters)), previousNode, g);
-      case "<fork_ops_join>" -> parseForkJoinNode(specificOpNode, previousNode, g, operatorCounters);
+    switch (specificOpNode.content()) {
+      case "<filter>" -> {
+        String id = "" + operatorCounters.merge("Filter", 1, Integer::sum);
+        return addSimpleOperatorStepToGraph(
+            new SimpleOperatorStep(parseFilterNode(specificOpNode, id)),
+            previousNode, g);
+      }
+      case "<map_duplicate>" -> {
+        String id = "" + operatorCounters.merge("MapDuplicate", 1, Integer::sum);
+        return addSimpleOperatorStepToGraph(
+            new SimpleOperatorStep(parseMapDuplicateNode(specificOpNode, id)),
+            previousNode, g);
+      }
+      case "<map_noise>" -> {
+        String id = "" + operatorCounters.merge("MapNoise", 1, Integer::sum);
+        return addSimpleOperatorStepToGraph(
+            new SimpleOperatorStep(parseMapNoiseNode(specificOpNode, id)),
+            previousNode, g);
+      }
+      case "<map_rir>" -> {
+        String id = "" + operatorCounters.merge("MapRIR", 1, Integer::sum);
+        return addSimpleOperatorStepToGraph(
+            new SimpleOperatorStep(parseMapRIRNode(specificOpNode, id)),
+            previousNode, g);
+      }
+      case "<map_aggregate>" -> {
+        String id = "" + operatorCounters.merge("MapAggregate", 1, Integer::sum);
+        return addSimpleOperatorStepToGraph(
+            new SimpleOperatorStep(parseMapAggregateNode(specificOpNode, id)),
+            previousNode, g);
+      }
+      case "<fork_ops_join>" -> {
+        return parseForkJoinNode(specificOpNode, previousNode, g, operatorCounters);
+      }
       default ->
         throw new IllegalArgumentException("Unknown operator type found in grammar tree: " + specificOpNode.content());
-    };
+    }
   }
 
-  private static String numberedRepresentation(String representation, Map<String, Integer> operatorCounters) {
-    int parenthesisIndex = representation.indexOf('(');
-    String operatorName = parenthesisIndex >= 0 ? representation.substring(0, parenthesisIndex) : representation;
-    int n = operatorCounters.merge(operatorName, 1, Integer::sum);
-    return operatorName + "(" + n + ")";
-  }
+  // private static String numberedRepresentation(String representation,
+  // Map<String, Integer> operatorCounters) {
+  // int parenthesisIndex = representation.indexOf('(');
+  // String operatorName = parenthesisIndex >= 0 ? representation.substring(0,
+  // parenthesisIndex) : representation;
+  // int n = operatorCounters.merge(operatorName, 1, Integer::sum);
+  // return operatorName + "(" + n + ")";
+  // }
 
   private OperatorRepresentation addSimpleOperatorStepToGraph(SimpleOperatorStep step,
       OperatorRepresentation previousNode, Graph<OperatorRepresentation, Arc> g) {
@@ -145,24 +165,55 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     return step;
   }
 
-  private String parseFilterNode(Tree<String> specificOpNode) {
-    return "Filter()";
+  private String parseFilterNode(Tree<String> specificOpNode, String id) {
+    StringBuilder valueStringBuilder = new StringBuilder();
+    valueStringBuilder.append("Filter(").append(id).append(",");
+    valueStringBuilder.append(specificOpNode.child(0).child(0).content()).append(","); // field attribute
+    valueStringBuilder.append(specificOpNode.child(1).child(0).content()).append(","); // condition attribute
+    specificOpNode.child(2).childStream().forEach(c -> {
+      if (c.nChildren() == 0) {
+        valueStringBuilder.append(c.content());
+      } else {
+        valueStringBuilder.append(c.child(0).content());
+      }
+    }); // value attribute
+    valueStringBuilder.append(")");
+    return valueStringBuilder.toString();
   }
 
-  private String parseMapDuplicateNode(Tree<String> specificOpNode) {
-    return "MapDuplicate()";
+  private String parseMapDuplicateNode(Tree<String> specificOpNode, String id) {
+    StringBuilder valueStringBuilder = new StringBuilder();
+    valueStringBuilder.append("MapDuplicate(").append(id).append(",");
+    valueStringBuilder.append(specificOpNode.child(0).child(0).content()); // probability attribute
+    valueStringBuilder.append(")");
+    return valueStringBuilder.toString();
   }
 
-  private String parseMapNoiseNode(Tree<String> specificOpNode) {
-    return "MapNoise()";
+  private String parseMapNoiseNode(Tree<String> specificOpNode, String id) {
+    StringBuilder valueStringBuilder = new StringBuilder();
+    valueStringBuilder.append("MapNoise(").append(id).append(",");
+    valueStringBuilder.append(specificOpNode.child(0).child(0).content()).append(","); // field attribute
+    valueStringBuilder.append(specificOpNode.child(1).child(0).content()); // percentage attribute
+    valueStringBuilder.append(")");
+    return valueStringBuilder.toString();
   }
 
-  private String parseMapRIRNode(Tree<String> specificOpNode) {
-    return "MapRIR()";
+  private String parseMapRIRNode(Tree<String> specificOpNode, String id) {
+    StringBuilder valueStringBuilder = new StringBuilder();
+    valueStringBuilder.append("MapRIR(").append(id).append(",");
+    valueStringBuilder.append(specificOpNode.child(0).child(0).content()); // field attribute
+    valueStringBuilder.append(")");
+    return valueStringBuilder.toString();
   }
 
-  private String parseMapAggregateNode(Tree<String> specificOpNode) {
-    return "MapAggregate()";
+  private String parseMapAggregateNode(Tree<String> specificOpNode, String id) {
+    StringBuilder valueStringBuilder = new StringBuilder();
+    valueStringBuilder.append("MapAggregate(").append(id).append(",");
+    valueStringBuilder.append(specificOpNode.child(0).child(0).content()).append(","); // field attribute
+    valueStringBuilder.append(specificOpNode.child(1).child(0).content()).append(","); // field agg_fun
+    valueStringBuilder.append(specificOpNode.child(2).child(0).content()); // field win_size
+    valueStringBuilder.append(")");
+    return valueStringBuilder.toString();
   }
 
   private OperatorRepresentation parseForkJoinNode(Tree<String> specificOpNode,
@@ -179,18 +230,18 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     Tree<String> leftPipelineNode = specificOpNode.child(0);
     Tree<String> rightPipelineNode = specificOpNode.child(1);
 
-    SimpleOperatorStep forkOp = new SimpleOperatorStep(numberedRepresentation("FORK", operatorCounters));
+    SimpleOperatorStep forkOp = new SimpleOperatorStep("FORK");
     g.addNode(forkOp);
     g.setArcValue(previousNode, forkOp, Arc.DEFAULT_ARC);
 
-    OperatorRepresentation leftBranch = parsePipelineNode(leftPipelineNode,forkOp, g, operatorCounters);
-    OperatorRepresentation rightBranch = parsePipelineNode(rightPipelineNode,forkOp, g, operatorCounters);
+    OperatorRepresentation leftBranch = parsePipelineNode(leftPipelineNode, forkOp, g, operatorCounters);
+    OperatorRepresentation rightBranch = parsePipelineNode(rightPipelineNode, forkOp, g, operatorCounters);
 
-    SimpleOperatorStep joinOp = new SimpleOperatorStep(numberedRepresentation("JOIN", operatorCounters));
+    SimpleOperatorStep joinOp = new SimpleOperatorStep("JOIN");
     g.addNode(joinOp);
     g.setArcValue(leftBranch, joinOp, Arc.DEFAULT_ARC);
     g.setArcValue(rightBranch, joinOp, Arc.DEFAULT_ARC);
-    
+
     return joinOp;
 
   }
@@ -241,7 +292,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
   public static String prettyPrintGraph(Graph<OperatorRepresentation, Arc> graph) {
 
     StringBuilder sb = new StringBuilder("\n");
-    for ( Graph.Arc<OperatorRepresentation> arc : graph.arcs()) {
+    for (Graph.Arc<OperatorRepresentation> arc : graph.arcs()) {
       sb.append(arc).append('\n');
     }
     return sb.toString();
@@ -260,7 +311,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
 
     @Override
     public final String toString() {
-        return representation;
+      return representation;
     }
   }
 
