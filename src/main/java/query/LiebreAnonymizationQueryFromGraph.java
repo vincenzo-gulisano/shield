@@ -2,32 +2,22 @@ package query;
 
 import common.util.Util;
 import component.operator.Operator;
+import component.operator.in1.map.MapFunction;
 import component.sink.Sink;
+import component.sink.SinkFunction;
 import component.source.Source;
 import component.source.SourceFunction;
-import event.EventFactory;
-import event.GenericEvent;
 import io.github.ericmedvet.jgea.core.representation.graph.Graph;
-import mappers.QueryMapper.Arc;
+import io.github.ericmedvet.jgea.core.representation.graph.Graph.Arc;
+import mappers.QueryMapper.ArcType;
 import mappers.QueryMapper.OperatorRepresentation;
-import mappers.QueryRepresentation;
-import query.utils.MovingAggregateMap;
-import query.utils.OperatorUtils;
-import query.utils.RIRMap;
 import usecase.common.Tuple;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.stream.Collectors;
-
-import static query.utils.OperatorUtils.*;
 
 // Class that translates a high-level QueryRepresentation (phenotype) into an executable Liebre query and
 // processes an input stream to produce a modified stream of events
@@ -35,165 +25,136 @@ public class LiebreAnonymizationQueryFromGraph {
 
     private static final Logger logger = LoggerFactory.getLogger(LiebreAnonymizationQueryFromGraph.class);
 
-    private final Random random;
-
     public LiebreAnonymizationQueryFromGraph() {
-        this.random = new Random();
     }
 
-    public List<Tuple> processAnonymizationQuery(Graph<OperatorRepresentation, Arc> g, List<Tuple> inputTuples) throws IOException {
+    public List<Tuple> processAnonymizationQuery(Graph<OperatorRepresentation, ArcType> g, List<Tuple> inputTuples)
+            throws IOException {
 
         final List<Tuple> collectedEvents = Collections.synchronizedList(new ArrayList<>());
 
         Query query = new Query();
 
-        Source<Tuple> source = null;
         SourceFunction<Tuple> collectionSource = createCollectionSource(inputTuples);
 
-        // Traverse the graph, and add operators depending on the type of the node in the graph
-        for(OperatorRepresentation opRep : g.nodes()) {
-            // String[] opRepresentation = opRep.getRepresentation();
-            // // Check the representaion format with a regex, it should be "OperatorType(param1,param2,...)", otherwise, the format is invalid
-            // switch (opRepresentation[0]) {
-            //     case "Source":
-            //         source = query.addBaseSource("source", collectionSource);
-            //         break;
-            
-            //     default:
-            //         break;
-            // }
+        Source<Tuple> source = null;
+        Sink<Tuple> sink = null;
+        Map<String, Operator<Tuple, Tuple>> operators = new HashMap<>();
+
+        // Traverse the graph, and add operators depending on the type of the node in
+        // the graph, notice we do not add forks / unions, since those are basically
+        // multi-writer and/or multi-writer streams.
+        for (OperatorRepresentation opRep : g.nodes()) {
+            switch (opRep) {
+                case mappers.QueryMapper.FilterOperator f -> {
+                    operators.put(f.getID(), query.addFilterOperator(f.getID(), f.createFilterFunction()));
+                }
+                case mappers.QueryMapper.MapDuplicate m -> {
+                    operators.put(m.getID(), query.addFlatMapOperator(m.getID(), m.createMapFunction()));
+                }
+                case mappers.QueryMapper.MapNoise m -> {
+                    operators.put(m.getID(), query.addMapOperator(m.getID(), m.createMapFunction()));
+                }
+                case mappers.QueryMapper.MapRIR m -> {
+                    operators.put(m.getID(), query.addMapOperator(m.getID(), m.createRIRMap()));
+                }
+                case mappers.QueryMapper.MapAggregate m -> {
+                    operators.put(m.getID(), query.addMapOperator(m.getID(), m.createMapFunction()));
+                }
+                case mappers.QueryMapper.Fork f -> {
+                    operators.put(f.getID(),
+                            query.addMapOperator(f.getID(), new MapFunction<Tuple, Tuple>() {
+                                @Override
+                                public Tuple apply(Tuple in) {
+                                    return in;
+                                }
+
+                            }));
+                }
+                case mappers.QueryMapper.Union u -> {
+                    operators.put(u.getID(),
+                            query.addMapOperator(u.getID(), new MapFunction<Tuple, Tuple>() {
+
+                                @Override
+                                public Tuple apply(Tuple in) {
+                                    return in;
+                                }
+
+                            }));
+                }
+                case
+
+                        mappers.QueryMapper.Source s -> {
+                    source = query.addBaseSource(s.getID(), collectionSource);
+                }
+                case
+                        mappers.QueryMapper.Sink s -> {
+                    sink = query.addBaseSink(s.getID(), new SinkFunction<Tuple>() {
+                        @Override
+                        public void accept(Tuple t) {
+                            if (t != null) {
+                                collectedEvents.add(t);
+                            }
+                        }
+                    });
+                }
+                default -> {
+                    throw new IllegalArgumentException(
+                            "Unknown operator type in graph: " + opRep.getClass().getSimpleName());
+                }
+            }
         }
 
+        // Now that operators are in place, we place connections. Single in - Single out
+        // can be placed immediately, from fork and to union must be "gathered" and than
+        // placed.
+        Map<Operator<Tuple, Tuple>, List<Operator<Tuple, Tuple>>> unionSources = new HashMap<>();
+        Map<Operator<Tuple, Tuple>, List<Operator<Tuple, Tuple>>> forkTargets = new HashMap<>();
+        for (Arc<OperatorRepresentation> arc : g.arcs()) {
 
+            // If the source id is the actual source, then it is safe to connected it to the
+            // target operator immediately
+            if (arc.source() instanceof mappers.QueryMapper.Source) {
+                query.connect(source, operators.get(arc.target().getID()));
+            }
 
-        // Define Source and CSV Reader (fixed part of the pipeline)
-        // long[] idCounter = {0};
-        // Source<String> source = query.addBaseSource("input-source", collectionSource);
-        // Operator<String, GenericEvent> reader = query.addMapOperator(
-        //         "csv-reader",
-        //         line -> {
-        //             if (line.equals(headerLine)) return null;
-        //             return EventFactory.createEventFromLine(line, headers, keyColumn, idCounter[0]++);
-        //         }
-        // );
-        // query.connect(source, reader);
+            // If the target id is the actual sink, then it is safe to connect it to the
+            // source operator immediately
+            else if (arc.target() instanceof mappers.QueryMapper.Sink) {
+                query.connect(operators.get(arc.source().getID()), sink);
+            }
 
-        // Build the operator chain by iterating through the representation's nodes
-        // Operator<?, GenericEvent> lastOperatorInChain = reader;
-        // int opCounter = 0;
+            // If the target is a union, we need to keep track of all the sources that need
+            // to be connected to it, and connect them later, since union can have multiple
+            // sources
+            else if (arc.target() instanceof mappers.QueryMapper.Union) {
+                unionSources.computeIfAbsent(operators.get(arc.target().getID()), k -> new ArrayList<>())
+                        .add(operators.get(arc.source().getID()));
+            }
 
-        // // Loop through each operator node in the phenotype representation
-        // for (QueryRepresentation.OperatorNode node: representation.operators()) {
-        //     // Create a unique id for the Liebre operator
-        //     String operatorId = node.type().name().toLowerCase() + "-" + opCounter++;
+            // If the source is a fork, we need to keep track of all the targets that need
+            // to be connected to it, and connect them later, since fork can have multiple
+            // targets
+            else if (arc.source() instanceof mappers.QueryMapper.Fork) {
+                forkTargets.computeIfAbsent(operators.get(arc.source().getID()), k -> new ArrayList<>())
+                        .add(operators.get(arc.target().getID()));
+            }
 
-        //     // Build the correct Liebre operator based on the node's type
-        //     switch (node.type()) {
-        //         case FILTER:
-        //             QueryRepresentation.FilterArgs filterArgs =
-        //                     (QueryRepresentation.FilterArgs) node.arguments();
+            // In the other cases, we can connect the source and target operator immediately
+            else {
+                query.connect(operators.get(arc.source().getID()), operators.get(arc.target().getID()));
+            }
+        }
 
-        //             Operator<GenericEvent, GenericEvent> filterOperator =
-        //                     query.addFilterOperator(
-        //                             operatorId,
-        //                             event -> OperatorUtils.evaluateCondition(
-        //                                     event,
-        //                                     filterArgs
-        //                             )
-        //                     );
+        // Connect unions to their sources
+        for (Map.Entry<Operator<Tuple, Tuple>, List<Operator<Tuple, Tuple>>> entry : unionSources.entrySet()) {
+            query.connect(entry.getValue(), entry.getKey());
+        }
 
-        //             query.connect(lastOperatorInChain, filterOperator);
-        //             lastOperatorInChain = filterOperator;
-        //             break;
-
-
-        //         case MAP_DUPLICATE:
-        //             QueryRepresentation.MapDuplicateArgs duplicateArgs = (QueryRepresentation.MapDuplicateArgs) node.arguments();
-        //             double duplicateProb = duplicateArgs.probability();
-
-        //             Operator<GenericEvent, GenericEvent> duplicateOperator = query.addFlatMapOperator(
-        //                     operatorId,
-        //                     event -> {
-        //                         List<GenericEvent> results = new ArrayList<>();
-        //                         results.add(event);
-        //                         if (random.nextDouble() < duplicateProb) {
-        //                             results.add(new GenericEvent(event, GenericEvent.EventType.DUPLICATE));
-        //                         }
-        //                         return results;
-        //                     }
-        //             );
-        //             query.connect(lastOperatorInChain, duplicateOperator);
-        //             lastOperatorInChain = duplicateOperator;
-        //             break;
-
-        //         case MAP_NOISE:
-        //             QueryRepresentation.MapNoiseArgs noiseArgs = (QueryRepresentation.MapNoiseArgs) node.arguments();
-
-        //             Operator<GenericEvent, GenericEvent> noiseOperator = query.addMapOperator(
-        //                     operatorId,
-        //                     event -> {
-        //                         if (event == null) return null;
-        //                         double originalValue = getAttributeValue(event, noiseArgs.attribute());
-        //                         if (Double.isNaN(originalValue)) return event;
-        //                         double sigma = noiseArgs.percentage() * Math.abs(originalValue);
-        //                         double noise = random.nextGaussian() * sigma;
-        //                         return applyNoise(event, noiseArgs.attribute(), originalValue, noise);
-        //                     }
-        //             );
-        //             query.connect(lastOperatorInChain, noiseOperator);
-        //             lastOperatorInChain = noiseOperator;
-        //             break;
-
-        //         case MAP_AGGREGATE:
-        //             QueryRepresentation.MapAggregateArgs aggregateArgs =
-        //                     (QueryRepresentation.MapAggregateArgs) node.arguments();
-
-        //             Operator<GenericEvent, GenericEvent> aggregateOperator =
-        //                     query.addMapOperator(
-        //                             operatorId,
-        //                             new MovingAggregateMap(aggregateArgs.attribute(), aggregateArgs.function(), aggregateArgs.windowSize())
-        //                     );
-
-        //             query.connect(lastOperatorInChain, aggregateOperator);
-        //             lastOperatorInChain = aggregateOperator;
-        //             break;
-
-        //         case MAP_RIR:
-        //             QueryRepresentation.MapRIRArgs rirArgs =
-        //                     (QueryRepresentation.MapRIRArgs) node.arguments();
-
-        //             Operator<GenericEvent, GenericEvent> rirMapOperator =
-        //                     query.addMapOperator(
-        //                             operatorId,
-        //                             new RIRMap(rirArgs.attribute())
-        //                     );
-
-        //             query.connect(lastOperatorInChain, rirMapOperator);
-        //             lastOperatorInChain = rirMapOperator;
-        //             break;
-
-        //         default:
-        //             logger.warn("Unsupported operator type in representation: {}", node.type());
-        //     }
-        // }
-
-        // // Define the final Sink
-        // Sink<GenericEvent> sink = query.addBaseSink("output-sink", event -> {
-        //     if (event != null) {
-        //         collectedEvents.add(event);
-        //     }
-        // });
-        // query.connect(lastOperatorInChain, sink);
-        // query.activate();
-
-
-        // while(sink.isEnabled()) {
-        //     try {
-        //         Thread.sleep(10);
-        //     } catch (InterruptedException e) {
-        //         e.printStackTrace();
-        //     }
-        // }
+        // Connect forks to their targets
+        for (Map.Entry<Operator<Tuple, Tuple>, List<Operator<Tuple, Tuple>>> entry : forkTargets.entrySet()) {
+            query.connect(List.of(entry.getKey()), entry.getValue());
+        }
 
         query.deActivate();
         return collectedEvents;

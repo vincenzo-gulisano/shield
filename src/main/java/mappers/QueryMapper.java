@@ -28,33 +28,40 @@ import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import component.operator.in1.filter.FilterFunction;
 import component.operator.in1.filter.FilterOperator;
-import mappers.QueryMapper.Arc;
+import component.operator.in1.map.FlatMapFunction;
+import mappers.QueryMapper.ArcType;
 import mappers.QueryMapper.OperatorRepresentation;
+import query.utils.MapAggregateFunction;
+import query.utils.MapDuplicateFunction;
+import query.utils.MapNoiseFunction;
+import query.utils.RIRMap;
+import usecase.common.Tuple;
 
-public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<OperatorRepresentation, Arc>> {
+public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<OperatorRepresentation, ArcType>> {
 
   private static final Logger logger = LoggerFactory.getLogger(QueryMapper.class);
 
   @Override
   public Tree<String> exampleFor(
-      Graph<OperatorRepresentation, Arc> exampleGraph) {
+      Graph<OperatorRepresentation, ArcType> exampleGraph) {
     return Tree.of("<pipeline>");
   }
 
   @Override
-  public Function<Tree<String>, Graph<OperatorRepresentation, Arc>> mapperFor(
-      Graph<OperatorRepresentation, Arc> exampleGraph) {
+  public Function<Tree<String>, Graph<OperatorRepresentation, ArcType>> mapperFor(
+      Graph<OperatorRepresentation, ArcType> exampleGraph) {
     return tree -> {
 
-      Graph<OperatorRepresentation, Arc> g = new LinkedHashGraph<>();
+      Graph<OperatorRepresentation, ArcType> g = new LinkedHashGraph<>();
       Map<String, Integer> operatorCounters = new HashMap<>();
       OperatorRepresentation sourceNode = new Source("source");
       g.addNode(sourceNode);
       OperatorRepresentation finalNode = parsePipelineNode(tree, sourceNode, g, operatorCounters);
       OperatorRepresentation sinkNode = new Sink("sink");
       g.addNode(sinkNode);
-      g.setArcValue(finalNode, sinkNode, Arc.DEFAULT_ARC);
+      g.setArcValue(finalNode, sinkNode, ArcType.DEFAULT_ARC);
       logger.info("Input tree:\n{}\n", prettyPrintTree(tree));
       logger.info("Resulting graph:\n{}\n", prettyPrintGraph(g));
       return g;
@@ -62,7 +69,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
   }
 
   private OperatorRepresentation parsePipelineNode(Tree<String> pipelineNode, OperatorRepresentation previousNode,
-      Graph<OperatorRepresentation, Arc> g, Map<String, Integer> operatorCounters) {
+      Graph<OperatorRepresentation, ArcType> g, Map<String, Integer> operatorCounters) {
 
     if (previousNode == null) {
       throw new IllegalArgumentException("Previous node cannot be null when parsing a <pipeline> node");
@@ -103,7 +110,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
   }
 
   private OperatorRepresentation parseOperatorNode(Tree<String> operatorNode, OperatorRepresentation previousNode,
-      Graph<OperatorRepresentation, Arc> g, Map<String, Integer> operatorCounters) {
+      Graph<OperatorRepresentation, ArcType> g, Map<String, Integer> operatorCounters) {
     Tree<String> specificOpNode = operatorNode.child(0);
 
     switch (specificOpNode.content()) {
@@ -155,13 +162,13 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
   // }
 
   private OperatorRepresentation addSimpleOperatorStepToGraph(OperatorRepresentation step,
-      OperatorRepresentation previousNode, Graph<OperatorRepresentation, Arc> g) {
+      OperatorRepresentation previousNode, Graph<OperatorRepresentation, ArcType> g) {
     g.addNode(step);
     if (previousNode == null) {
       throw new IllegalArgumentException(
           "Previous node cannot be null when adding a simple operator step to the graph");
     }
-    g.setArcValue(previousNode, step, Arc.DEFAULT_ARC);
+    g.setArcValue(previousNode, step, ArcType.DEFAULT_ARC);
     return step;
   }
 
@@ -193,12 +200,13 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
   }
 
   private OperatorRepresentation parseMapAggregateNode(Tree<String> specificOpNode, String id) {
-    return new MapAggregate(id, specificOpNode.child(0).child(0).content(), specificOpNode.child(1).child(0).content(),
+    return new MapAggregate(id, specificOpNode.child(0).child(0).content(),
+        MapAggregateAggregatorFunction.valueOf(specificOpNode.child(1).child(0).content().toUpperCase()),
         Integer.valueOf(specificOpNode.child(2).child(0).content()));
   }
 
   private OperatorRepresentation parseForkJoinNode(Tree<String> specificOpNode,
-      OperatorRepresentation previousNode, Graph<OperatorRepresentation, Arc> g,
+      OperatorRepresentation previousNode, Graph<OperatorRepresentation, ArcType> g,
       Map<String, Integer> operatorCounters) {
     if (specificOpNode.nChildren() != 2) {
       throw new IllegalArgumentException(
@@ -211,12 +219,12 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
 
     Tree<String> leftPipelineNode = specificOpNode.child(0);
     Tree<String> rightPipelineNode = specificOpNode.child(1);
-  
+
     String forkId = "" + operatorCounters.merge("FORK", 1, Integer::sum);
 
     OperatorRepresentation forkOp = new Fork(forkId);
     g.addNode(forkOp);
-    g.setArcValue(previousNode, forkOp, Arc.DEFAULT_ARC);
+    g.setArcValue(previousNode, forkOp, ArcType.DEFAULT_ARC);
 
     OperatorRepresentation leftBranch = parsePipelineNode(leftPipelineNode, forkOp, g, operatorCounters);
     OperatorRepresentation rightBranch = parsePipelineNode(rightPipelineNode, forkOp, g, operatorCounters);
@@ -225,14 +233,14 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
 
     OperatorRepresentation joinOp = new Union(unionId);
     g.addNode(joinOp);
-    g.setArcValue(leftBranch, joinOp, Arc.DEFAULT_ARC);
-    g.setArcValue(rightBranch, joinOp, Arc.DEFAULT_ARC);
+    g.setArcValue(leftBranch, joinOp, ArcType.DEFAULT_ARC);
+    g.setArcValue(rightBranch, joinOp, ArcType.DEFAULT_ARC);
 
     return joinOp;
 
   }
 
-  public enum Arc {
+  public enum ArcType {
     DEFAULT_ARC
   }
 
@@ -275,7 +283,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     return content.substring(1, content.length() - 1);
   }
 
-  public static String prettyPrintGraph(Graph<OperatorRepresentation, Arc> graph) {
+  public static String prettyPrintGraph(Graph<OperatorRepresentation, ArcType> graph) {
 
     StringBuilder sb = new StringBuilder("\n");
     for (Graph.Arc<OperatorRepresentation> arc : graph.arcs()) {
@@ -284,16 +292,22 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     return sb.toString();
   }
 
-  public enum OperatorType {
-    FILTER,
-    MAP_DUPLICATE,
-    MAP_NOISE,
-    MAP_RIR,
-    MAP_AGGREGATE,
-    FORK,
-    UNION,
-    SOURCE,
-    SINK
+  // public enum OperatorType {
+  // FILTER,
+  // MAP_DUPLICATE,
+  // MAP_NOISE,
+  // MAP_RIR,
+  // MAP_AGGREGATE,
+  // FORK,
+  // UNION,
+  // SOURCE,
+  // SINK
+  // }
+
+  public enum MapAggregateAggregatorFunction {
+    MIN,
+    AVG,
+    MAX
   }
 
   public sealed interface OperatorRepresentation
@@ -301,63 +315,92 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     public String getID();
   }
 
-  record FilterOperator(String id, String field, String condition, double value) implements OperatorRepresentation {
+  public record FilterOperator(String id, String field, String condition, double value)
+      implements OperatorRepresentation {
+    @Override
+    public String getID() {
+      return id;
+    }
+
+    public FilterFunction<Tuple> createFilterFunction() {
+      switch (condition) {
+        case "lt":
+          return t -> t.lookup(field) < value;
+        case "gt":
+          return t -> t.lookup(field) > value;
+        default:
+          throw new IllegalArgumentException("Unkown condition " + condition + " for filter " + getID());
+      }
+    }
+  }
+
+  public record MapDuplicate(String id, double probability) implements OperatorRepresentation {
+    @Override
+    public String getID() {
+      return id;
+    }
+
+    public FlatMapFunction<Tuple, Tuple> createMapFunction() {
+      return new MapDuplicateFunction(probability);
+    }
+  }
+
+  public record MapNoise(String id, String field, double probability) implements OperatorRepresentation {
+    @Override
+    public String getID() {
+      return id;
+    }
+
+    public MapNoiseFunction createMapFunction() {
+      return new MapNoiseFunction(field, probability);
+    }
+  }
+
+  public record MapRIR(String id, String field) implements OperatorRepresentation {
+    @Override
+    public String getID() {
+      return id;
+    }
+
+    public RIRMap createRIRMap() {
+      return new RIRMap(getID());
+    }
+  }
+
+  public record MapAggregate(String id, String field, MapAggregateAggregatorFunction aggFunction, int windowSize)
+      implements OperatorRepresentation {
+    @Override
+    public String getID() {
+      return id;
+    }
+
+    public MapAggregateFunction createMapFunction() {
+      return new MapAggregateFunction(field, aggFunction, windowSize);
+    }
+  }
+
+  public record Fork(String id) implements OperatorRepresentation {
     @Override
     public String getID() {
       return id;
     }
   }
 
-  record MapDuplicate(String id, double probability) implements OperatorRepresentation {
+  public record Union(String id) implements OperatorRepresentation {
     @Override
     public String getID() {
       return id;
     }
   }
 
-  record MapNoise(String id, String field, double probability) implements OperatorRepresentation {
+  public record Source(String id) implements OperatorRepresentation {
     @Override
     public String getID() {
       return id;
     }
   }
 
-  record MapRIR(String id, String field) implements OperatorRepresentation {
-    @Override
-    public String getID() {
-      return id;
-    }
-  }
-
-  record MapAggregate(String id, String field, String aggFunction, int windowSize) implements OperatorRepresentation {
-    @Override
-    public String getID() {
-      return id;
-    }
-  }
-
-  record Fork(String id) implements OperatorRepresentation {
-    @Override
-    public String getID() {
-      return id;
-    }
-  }
-
-  record Union(String id) implements OperatorRepresentation {
-    @Override
-    public String getID() {
-      return id;
-    }
-  }
-
-  record Source(String id) implements OperatorRepresentation {
-    @Override
-    public String getID() {
-      return id;
-    }
-  }
-
-  record Sink(String id) implements OperatorRepresentation {
+  public record Sink(String id) implements OperatorRepresentation {
     @Override
     public String getID() {
       return id;

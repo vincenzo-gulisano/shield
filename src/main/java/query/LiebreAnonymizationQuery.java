@@ -152,18 +152,19 @@ public class LiebreAnonymizationQuery {
                     break;
 
                 case MAP_RIR:
-                    QueryRepresentation.MapRIRArgs rirArgs =
-                            (QueryRepresentation.MapRIRArgs) node.arguments();
+                    throw new IllegalArgumentException("Map RIR can be created only from graph representations");
+                    // QueryRepresentation.MapRIRArgs rirArgs =
+                    //         (QueryRepresentation.MapRIRArgs) node.arguments();
 
-                    Operator<GenericEvent, GenericEvent> rirMapOperator =
-                            query.addMapOperator(
-                                    operatorId,
-                                    new RIRMap(rirArgs.attribute())
-                            );
+                    // Operator<GenericEvent, GenericEvent> rirMapOperator =
+                    //         query.addMapOperator(
+                    //                 operatorId,
+                    //                 new RIRMap(rirArgs.attribute())
+                    //         );
 
-                    query.connect(lastOperatorInChain, rirMapOperator);
-                    lastOperatorInChain = rirMapOperator;
-                    break;
+                    // query.connect(lastOperatorInChain, rirMapOperator);
+                    // lastOperatorInChain = rirMapOperator;
+                    // break;
 
                 default:
                     logger.warn("Unsupported operator type in representation: {}", node.type());

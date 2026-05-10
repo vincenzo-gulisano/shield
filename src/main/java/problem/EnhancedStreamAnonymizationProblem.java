@@ -36,7 +36,7 @@ import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import mappers.QueryMapper.Arc;
+import mappers.QueryMapper.ArcType;
 import mappers.QueryMapper.OperatorRepresentation;
 import metrics.performance.PerformanceSimilarity;
 import metrics.performance.utils.StreamStatsWindow;
@@ -48,7 +48,7 @@ import usecase.forkjoin.synthetic.MainQuery;
 import usecase.forkjoin.synthetic.MainQuery.QueryResult;
 
 public class EnhancedStreamAnonymizationProblem implements
-    SimpleMOProblem<Graph<OperatorRepresentation, Arc>, Double> {
+    SimpleMOProblem<Graph<OperatorRepresentation, ArcType>, Double> {
 
   private static final Logger logger = LoggerFactory.getLogger(StreamAnonymizationProblem.class);
 
@@ -94,7 +94,7 @@ public class EnhancedStreamAnonymizationProblem implements
   }
 
   @Override
-  public Function<Graph<OperatorRepresentation, Arc>, SequencedMap<String, Double>> qualityFunction() {
+  public Function<Graph<OperatorRepresentation, ArcType>, SequencedMap<String, Double>> qualityFunction() {
     return g -> {
       // TODO 1. transform the graph in a liebre query
       // TODO 2. load the data and start the engine

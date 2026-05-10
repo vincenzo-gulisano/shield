@@ -28,6 +28,10 @@ public class Tuple extends BaseRichTuple implements DoubleFieldLookup {
         this.fs = fs;
     }
 
+    public Tuple(Tuple other) {
+        this(other.stimulus, other.timestamp, other.key, other.fs);
+    }
+
     public double getField(String fieldName) {
         return switch (fieldName) {
             case "f1" -> fs[0];
@@ -43,6 +47,16 @@ public class Tuple extends BaseRichTuple implements DoubleFieldLookup {
 
     public int getNumFields() {
         return fs.length;
+    }
+
+    @Override
+    public void set(String fieldName, double value) {
+        switch (fieldName) {
+            case "f1" -> fs[0] = value;
+            case "f2" -> fs[1] = value;
+            default -> throw new IllegalArgumentException("Unknown field name: " + fieldName);
+        }
+        ;
     }
 
 }

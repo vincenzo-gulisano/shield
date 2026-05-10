@@ -3,6 +3,9 @@ package query.utils;
 import component.operator.in1.map.MapFunction;
 import event.GenericEvent;
 import mappers.QueryRepresentation;
+import usecase.common.Tuple;
+
+import static query.utils.OperatorUtils.setAttributeValue;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -14,31 +17,31 @@ import java.util.Random;
  *
  * This class is stateful and maintains an internal buffer of recent values
  */
-public class RIRMap implements MapFunction<GenericEvent, GenericEvent> {
+public class RIRMap implements MapFunction<Tuple, Tuple> {
 
-    private final String attribute;
+    private final String field;
     private double min = Double.MAX_VALUE;
     private double max = Double.MIN_VALUE;
     private final Random random;
     
-    public RIRMap(String attribute) {
-        this.attribute = attribute;
+    public RIRMap(String field) {
+        this.field = field;
         this.random = new Random();
     }
 
     // Applies the moving average transformation to a single event
     @Override
-    public GenericEvent apply(GenericEvent currentEvent) {
-        if (currentEvent == null) {
+    public Tuple apply(Tuple in) {
+        if (in == null) {
             return null;
         }
 
         // Extract the value of the target attribute from the current event
-        double currentValue = OperatorUtils.getAttributeValue(currentEvent, attribute);
+        double currentValue = in.lookup(field);
 
         // If the current value is NaN, do not update the window or apply a new value
         if (Double.isNaN(currentValue)) {
-            return new GenericEvent(currentEvent);
+            return in;
         }
 
         // Update the min and max values
@@ -50,19 +53,10 @@ public class RIRMap implements MapFunction<GenericEvent, GenericEvent> {
         }
 
         // Create a copy of the event and set the calculated transformation on the corresponding attribute
-        GenericEvent anonymizedEvent = new GenericEvent(currentEvent);
-        OperatorUtils.setAttributeValue(anonymizedEvent, attribute, this.random.nextDouble(min, max));
+        Tuple out = new Tuple(in);
+        out.set(field, this.random.nextDouble(min, max));
 
-        return anonymizedEvent;
+        return out;
     }
 
-    @Override
-    public void enable() {
-        // No specific action needed on enable
-    }
-
-    @Override
-    public void disable() {
-        // No specific action needed on disable
-    }
 }
