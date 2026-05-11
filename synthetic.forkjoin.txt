@@ -23,41 +23,41 @@ ea.experiment(
       path = $basePath + "solutions-percentile.csv";
       eFunctions = [
         f.mapValue(key = privacy; of = ea.f.quality(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality()))));
-        f.mapValue(key = "results-similarity"; of = ea.f.quality(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality()))));
-        f.mapValue(key = "performance-similarity"; of = ea.f.quality(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality()))));
+        f.mapValue(key = "semantics"; of = ea.f.quality(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality()))));
+        f.mapValue(key = "fidelity"; of = ea.f.quality(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality()))));
         ea.f.solution(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality())));
 
-        f.mapValue(key = privacy; of = ea.f.quality(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = "results-similarity"; of = ea.f.quality()))));
-        f.mapValue(key = "results-similarity"; of = ea.f.quality(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = "results-similarity"; of = ea.f.quality()))));
-        f.mapValue(key = "performance-similarity"; of = ea.f.quality(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = "results-similarity"; of = ea.f.quality()))));
-        ea.f.solution(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = "results-similarity"; of = ea.f.quality())));
+        f.mapValue(key = privacy; of = ea.f.quality(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = "semantics"; of = ea.f.quality()))));
+        f.mapValue(key = "semantics"; of = ea.f.quality(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = "semantics"; of = ea.f.quality()))));
+        f.mapValue(key = "fidelity"; of = ea.f.quality(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = "semantics"; of = ea.f.quality()))));
+        ea.f.solution(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = "semantics"; of = ea.f.quality())));
 
-        f.mapValue(key = privacy; of = ea.f.quality(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = "performance-similarity"; of = ea.f.quality()))));
-        f.mapValue(key = "results-similarity"; of = ea.f.quality(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = "performance-similarity"; of = ea.f.quality()))));
-        f.mapValue(key = "performance-similarity"; of = ea.f.quality(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = "performance-similarity"; of = ea.f.quality()))));
-        ea.f.solution(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = "performance-similarity"; of = ea.f.quality())));
+        f.mapValue(key = privacy; of = ea.f.quality(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = "fidelity"; of = ea.f.quality()))));
+        f.mapValue(key = "semantics"; of = ea.f.quality(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = "fidelity"; of = ea.f.quality()))));
+        f.mapValue(key = "fidelity"; of = ea.f.quality(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = "fidelity"; of = ea.f.quality()))));
+        ea.f.solution(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = "fidelity"; of = ea.f.quality())));
 
         f.mapValue(key = privacy; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality()))));
-        f.mapValue(key = "results-similarity"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality()))));
-        f.mapValue(key = "performance-similarity"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality()))));
+        f.mapValue(key = "semantics"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality()))));
+        f.mapValue(key = "fidelity"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality()))));
         ea.f.solution(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality())));
 
-        f.mapValue(key = privacy; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "results-similarity"; of = ea.f.quality()))));
-        f.mapValue(key = "results-similarity"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "results-similarity"; of = ea.f.quality()))));
-        f.mapValue(key = "performance-similarity"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "results-similarity"; of = ea.f.quality()))));
-        ea.f.solution(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "results-similarity"; of = ea.f.quality())));
+        f.mapValue(key = privacy; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "semantics"; of = ea.f.quality()))));
+        f.mapValue(key = "semantics"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "semantics"; of = ea.f.quality()))));
+        f.mapValue(key = "fidelity"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "semantics"; of = ea.f.quality()))));
+        ea.f.solution(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "semantics"; of = ea.f.quality())));
 
-        f.mapValue(key = privacy; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "performance-similarity"; of = ea.f.quality()))));
-        f.mapValue(key = "results-similarity"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "performance-similarity"; of = ea.f.quality()))));
-        f.mapValue(key = "performance-similarity"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "performance-similarity"; of = ea.f.quality()))));
-        ea.f.solution(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "performance-similarity"; of = ea.f.quality())))
+        f.mapValue(key = privacy; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "fidelity"; of = ea.f.quality()))));
+        f.mapValue(key = "semantics"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "fidelity"; of = ea.f.quality()))));
+        f.mapValue(key = "fidelity"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "fidelity"; of = ea.f.quality()))));
+        ea.f.solution(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "fidelity"; of = ea.f.quality())))
       ]
     );
     ea.l.savePlotForRun(
       path = $basePath + "scatter-performance-vs-results-{randomGenerator.seed:%03d}.svg";
       plot = ea.plot.single.biObjectivePopulation(
-        x = f.mapValue(key = "performance-similarity"; of = ea.f.quality());
-        y = f.mapValue(key = "results-similarity"; of = ea.f.quality())
+        x = f.mapValue(key = "fidelity"; of = ea.f.quality());
+        y = f.mapValue(key = "semantics"; of = ea.f.quality())
       );
       configuration = viz.plot.conf.image(axesShow = all; axesIndependences = [all]);
       secondary = true;
@@ -67,7 +67,7 @@ ea.experiment(
       path = $basePath + "scatter-privacy-vs-results-{randomGenerator.seed:%03d}.svg";
       plot = ea.plot.single.biObjectivePopulation(
         x = f.mapValue(key = privacy; of = ea.f.quality());
-        y = f.mapValue(key = "results-similarity"; of = ea.f.quality())
+        y = f.mapValue(key = "semantics"; of = ea.f.quality())
       );
       configuration = viz.plot.conf.image(axesShow = all; axesIndependences = [all]);
       secondary = true;
@@ -76,7 +76,7 @@ ea.experiment(
     ea.l.savePlotForRun(
       path = $basePath + "scatter-performance-vs-privacy-{randomGenerator.seed:%03d}.svg";
       plot = ea.plot.single.biObjectivePopulation(
-        x = f.mapValue(key = "performance-similarity"; of = ea.f.quality());
+        x = f.mapValue(key = "fidelity"; of = ea.f.quality());
         y = f.mapValue(key = privacy; of = ea.f.quality())
       );
       configuration = viz.plot.conf.image(axesShow = all; axesIndependences = [all]);
@@ -86,7 +86,7 @@ ea.experiment(
     ea.l.savePlotForExp(
       path = $basePath + "p75privacy-results.svg";
       plot = ea.plot.multi.xyExp(
-        y = f.mapValue(key = "results-similarity"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality()))))
+        y = f.mapValue(key = "semantics"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality()))))
       );
       configuration = viz.plot.conf.image(axesShow = all; axesIndependences = [all]);
       type = svg
@@ -94,7 +94,7 @@ ea.experiment(
     ea.l.savePlotForExp(
       path = $basePath + "p75privacy-performance.svg";
       plot = ea.plot.multi.xyExp(
-        y = f.mapValue(key = "performance-similarity"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality()))))
+        y = f.mapValue(key = "fidelity"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality()))))
       );
       configuration = viz.plot.conf.image(axesShow = all; axesIndependences = [all]);
       type = svg
@@ -102,7 +102,7 @@ ea.experiment(
     ea.l.savePlotForExp(
       path = $basePath + "p75results-privacy.svg";
       plot = ea.plot.multi.xyExp(
-        y = f.mapValue(key = "privacy"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "results-similarity"; of = ea.f.quality()))))
+        y = f.mapValue(key = "privacy"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "semantics"; of = ea.f.quality()))))
       );
       configuration = viz.plot.conf.image(axesShow = all; axesIndependences = [all]);
       type = svg
@@ -110,7 +110,7 @@ ea.experiment(
     ea.l.savePlotForExp(
       path = $basePath + "p75results-performance.svg";
       plot = ea.plot.multi.xyExp(
-        y = f.mapValue(key = "performance-similarity"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "results-similarity"; of = ea.f.quality()))))
+        y = f.mapValue(key = "fidelity"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "semantics"; of = ea.f.quality()))))
       );
       configuration = viz.plot.conf.image(axesShow = all; axesIndependences = [all]);
       type = svg
@@ -118,7 +118,7 @@ ea.experiment(
     ea.l.savePlotForExp(
       path = $basePath + "p75performance-privacy.svg";
       plot = ea.plot.multi.xyExp(
-        y = f.mapValue(key = privacy; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "performance-similarity"; of = ea.f.quality()))))
+        y = f.mapValue(key = privacy; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "fidelity"; of = ea.f.quality()))))
       );
       configuration = viz.plot.conf.image(axesShow = all; axesIndependences = [all]);
       type = svg
@@ -126,7 +126,7 @@ ea.experiment(
     ea.l.savePlotForExp(
       path = $basePath + "p75performance-results.svg";
       plot = ea.plot.multi.xyExp(
-        y = f.mapValue(key = "results-similarity"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "performance-similarity"; of = ea.f.quality()))))
+        y = f.mapValue(key = "semantics"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "fidelity"; of = ea.f.quality()))))
       );
       configuration = viz.plot.conf.image(axesShow = all; axesIndependences = [all]);
       type = svg
@@ -138,14 +138,14 @@ ea.experiment(
           type = svg
     );
     ea.l.savePlotForExp(
-          path = $basePath + "p75-results-similarity.svg";
-          plot = ea.plot.multi.xyExp(y = f.percentile(p = 75; of = f.each(of = ea.f.all(); mapF = f.mapValue(key = "results-similarity"; of = ea.f.quality()))));
+          path = $basePath + "p75-semantics.svg";
+          plot = ea.plot.multi.xyExp(y = f.percentile(p = 75; of = f.each(of = ea.f.all(); mapF = f.mapValue(key = "semantics"; of = ea.f.quality()))));
           configuration = viz.plot.conf.image(axesShow = all; axesIndependences = [all]);
           type = svg
     );
     ea.l.savePlotForExp(
-          path = $basePath + "p75-performance-similarity.svg";
-          plot = ea.plot.multi.xyExp(y = f.percentile(p = 75; of = f.each(of = ea.f.all(); mapF = f.mapValue(key = "performance-similarity"; of = ea.f.quality()))));
+          path = $basePath + "p75-fidelity.svg";
+          plot = ea.plot.multi.xyExp(y = f.percentile(p = 75; of = f.each(of = ea.f.all(); mapF = f.mapValue(key = "fidelity"; of = ea.f.quality()))));
           configuration = viz.plot.conf.image(axesShow = all; axesIndependences = [all]);
           type = svg
     )

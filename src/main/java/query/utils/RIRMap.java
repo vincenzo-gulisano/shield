@@ -12,8 +12,10 @@ import java.util.Deque;
 import java.util.Random;
 
 /**
- * A stateful MapFunction that replaces an attribute's value with a moving average
- * The average is calculated over the last N valid (non-NaN) values encountered in the stream
+ * A stateful MapFunction that replaces an attribute's value with a moving
+ * average
+ * The average is calculated over the last N valid (non-NaN) values encountered
+ * in the stream
  *
  * This class is stateful and maintains an internal buffer of recent values
  */
@@ -23,7 +25,7 @@ public class RIRMap implements MapFunction<Tuple, Tuple> {
     private double min = Double.MAX_VALUE;
     private double max = Double.MIN_VALUE;
     private final Random random;
-    
+
     public RIRMap(String field) {
         this.field = field;
         this.random = new Random();
@@ -52,10 +54,12 @@ public class RIRMap implements MapFunction<Tuple, Tuple> {
             max = currentValue;
         }
 
-        // Create a copy of the event and set the calculated transformation on the corresponding attribute
+        // Create a copy of the event and set the calculated transformation on the
+        // corresponding attribute
         Tuple out = new Tuple(in);
-        out.set(field, this.random.nextDouble(min, max));
-
+        if (max > min) {
+            out.set(field, this.random.nextDouble(min, max));
+        }
         return out;
     }
 

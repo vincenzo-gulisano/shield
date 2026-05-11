@@ -62,8 +62,8 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
       OperatorRepresentation sinkNode = new Sink("sink");
       g.addNode(sinkNode);
       g.setArcValue(finalNode, sinkNode, ArcType.DEFAULT_ARC);
-      logger.info("Input tree:\n{}\n", prettyPrintTree(tree));
-      logger.info("Resulting graph:\n{}\n", prettyPrintGraph(g));
+      // logger.info("Input tree:\n{}\n", prettyPrintTree(tree));
+      // logger.info("Resulting graph:\n{}\n", prettyPrintGraph(g));
       return g;
     };
   }
@@ -363,7 +363,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     }
 
     public RIRMap createRIRMap() {
-      return new RIRMap(getID());
+      return new RIRMap(field);
     }
   }
 

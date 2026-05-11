@@ -31,11 +31,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.SequencedMap;
 import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import event.GenericEvent;
 import mappers.QueryMapper.ArcType;
 import mappers.QueryMapper.OperatorRepresentation;
 import metrics.performance.PerformanceSimilarity;
@@ -43,6 +45,12 @@ import metrics.performance.utils.StreamStatsWindow;
 import metrics.privacy.KAnonymityPrivacyCardinality;
 import metrics.results.F1Score;
 import problem.utils.PrivacyMetricChoice;
+import query.LiebreAnonymizationQuery;
+import query.LiebreAnonymizationQueryFromGraph;
+import query.LiebreContext;
+import query.MainQueryAirQuality;
+import query.MainQueryGeoLife;
+import query.MainQueryResult;
 import usecase.common.Tuple;
 import usecase.forkjoin.synthetic.MainQuery;
 import usecase.forkjoin.synthetic.MainQuery.QueryResult;
@@ -52,6 +60,17 @@ public class EnhancedStreamAnonymizationProblem implements
 
   private static final Logger logger = LoggerFactory.getLogger(StreamAnonymizationProblem.class);
 
+  // Define a static counter for unique query ID
+  private static final AtomicLong queryCounter = new AtomicLong(0);
+
+  static {
+    // Notify the Terminator not to end after the first query has completed
+    LiebreContext.setSingleQueryExecution(false);
+  }
+
+  private final long minTs, maxTs;
+  private final PrivacyMetricChoice privacyMetricChoice;
+  private final QueryResult mainQueryResults;
   private final KAnonymityPrivacyCardinality privacyMetricCalculator;
   private final Distance<StreamStatsWindow> fidelityMetricCalculator;
   private final F1Score semanticsMetricCalculator;
@@ -64,17 +83,18 @@ public class EnhancedStreamAnonymizationProblem implements
     inputTuples = loadTuples(inputCsvPath);
 
     logger.info("Executing the main query to get the original results and performance metrics");
-    long minTs = inputTuples.getFirst().getTimestamp();
-    long maxTs = inputTuples.getLast().getTimestamp();
-    QueryResult mainQueryResults = MainQuery.process(inputTuples, "main", minTs, maxTs);
+    this.minTs = inputTuples.getFirst().getTimestamp();
+    this.maxTs = inputTuples.getLast().getTimestamp();
+    this.mainQueryResults = MainQuery.process(inputTuples, "main", minTs, maxTs);
     logger.info("Main query executed successfully, returning {} results, and the following metrics:\n{}",
         mainQueryResults.events().size(), mainQueryResults.statsWindow());
 
+    this.privacyMetricChoice = privacyMetric;
     List<String> attributes = List.of(Tuple.getFieldNames(inputTuples.get(0).getNumFields()));
     this.privacyMetricCalculator = new KAnonymityPrivacyCardinality(inputTuples, 50, attributes);
     this.fidelityMetricCalculator = new PerformanceSimilarity(mainQueryResults.statsWindow(), true);
     this.semanticsMetricCalculator = new F1Score(0.1, attributes);
-    
+
     logger.info("Empty query privacy, fidelity, and semantics scores: {}, {}, and {}",
         privacyMetricCalculator.applyWithQuantile99(inputTuples, inputTuples),
         fidelityMetricCalculator.apply(mainQueryResults.statsWindow(), mainQueryResults.statsWindow()),
@@ -85,7 +105,7 @@ public class EnhancedStreamAnonymizationProblem implements
   private final static SequencedMap<String, Comparator<Double>> OBJECTIVES = new TreeMap<>(
       Map.ofEntries(
           Map.entry("privacy", ((Comparator<Double>) Double::compareTo).reversed()),
-          Map.entry("results-similarity", ((Comparator<Double>) Double::compareTo).reversed()),
+          Map.entry("semantics", ((Comparator<Double>) Double::compareTo).reversed()),
           Map.entry("performance-similarity", ((Comparator<Double>) Double::compareTo).reversed())));
 
   @Override
@@ -96,10 +116,52 @@ public class EnhancedStreamAnonymizationProblem implements
   @Override
   public Function<Graph<OperatorRepresentation, ArcType>, SequencedMap<String, Double>> qualityFunction() {
     return g -> {
-      // TODO 1. transform the graph in a liebre query
-      // TODO 2. load the data and start the engine
-      // TODO 3. do stuff and return metrics
-      return new TreeMap<>(Map.of());
+      SequencedMap<String, Double> qualities = new TreeMap<>();
+      Long counter = queryCounter.getAndIncrement();
+      String queryId = String.valueOf(counter);
+      try {
+        // Create an executable Liebre query and execute this anonymization query
+        LiebreAnonymizationQueryFromGraph liebreExecutor = new LiebreAnonymizationQueryFromGraph();
+        List<Tuple> modifiedEvents = liebreExecutor.processAnonymizationQuery(g, inputTuples);
+
+        double privacyScore;
+        // Based on the user choice, calculate the correct privacy metric
+        switch (privacyMetricChoice) {
+          case K_ANONYMITY_CARDINALITY_MAX ->
+            privacyScore = privacyMetricCalculator.applyWithMax(inputTuples, modifiedEvents);
+          case K_ANONYMITY_CARDINALITY_Q99 ->
+            privacyScore = privacyMetricCalculator.applyWithQuantile99(inputTuples, modifiedEvents);
+          case K_ANONYMITY_CARDINALITY ->
+            privacyScore = privacyMetricCalculator.apply(inputTuples, modifiedEvents);
+          default -> privacyScore = privacyMetricCalculator.apply(inputTuples, modifiedEvents);
+        }
+        qualities.put("privacy", privacyScore);
+        
+
+        // Case with empty modified datastream
+        if (modifiedEvents.isEmpty()) {
+          qualities.put("privacy", privacyScore);
+          qualities.put("semantics", 0.0);
+          StreamStatsWindow emptyStats = new StreamStatsWindow(
+              mainQueryResults.statsWindow().streamNames(),
+              mainQueryResults.statsWindow().minTimestamp(),
+              mainQueryResults.statsWindow().maxTimestamp(),
+              mainQueryResults.statsWindow().getResolutionMillis());
+          qualities.put("performance-similarity",
+              fidelityMetricCalculator.apply(mainQueryResults.statsWindow(), emptyStats));
+          return qualities;
+        }
+
+        QueryResult modifiedOutcome = MainQuery.process(modifiedEvents, queryId, minTs, maxTs);
+        
+        StreamStatsWindow modifiedStats = modifiedOutcome.statsWindow();
+        qualities.put("performance-similarity", fidelityMetricCalculator.apply(mainQueryResults.statsWindow(), modifiedStats));
+        qualities.put("semantics", semanticsMetricCalculator.apply(mainQueryResults.events(), modifiedOutcome.events()));
+        return qualities;
+
+      } catch (Exception e) {
+        throw new RuntimeException("Error executing query " + queryId + " for graph " + g, e);
+      }
     };
   }
 

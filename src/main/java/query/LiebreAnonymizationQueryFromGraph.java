@@ -155,6 +155,15 @@ public class LiebreAnonymizationQueryFromGraph {
         for (Map.Entry<Operator<Tuple, Tuple>, List<Operator<Tuple, Tuple>>> entry : forkTargets.entrySet()) {
             query.connect(List.of(entry.getKey()), entry.getValue());
         }
+        query.activate();
+
+        while (sink.isEnabled()) {
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
 
         query.deActivate();
         return collectedEvents;
