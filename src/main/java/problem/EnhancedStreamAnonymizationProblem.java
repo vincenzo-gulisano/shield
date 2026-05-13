@@ -106,7 +106,7 @@ public class EnhancedStreamAnonymizationProblem implements
       Map.ofEntries(
           Map.entry("privacy", ((Comparator<Double>) Double::compareTo).reversed()),
           Map.entry("semantics", ((Comparator<Double>) Double::compareTo).reversed()),
-          Map.entry("performance-similarity", ((Comparator<Double>) Double::compareTo).reversed())));
+          Map.entry("fidelity", ((Comparator<Double>) Double::compareTo).reversed())));
 
   @Override
   public SequencedMap<String, Comparator<Double>> comparators() {
@@ -118,11 +118,17 @@ public class EnhancedStreamAnonymizationProblem implements
     return g -> {
       SequencedMap<String, Double> qualities = new TreeMap<>();
       Long counter = queryCounter.getAndIncrement();
+
       String queryId = String.valueOf(counter);
       try {
         // Create an executable Liebre query and execute this anonymization query
         LiebreAnonymizationQueryFromGraph liebreExecutor = new LiebreAnonymizationQueryFromGraph();
+
+        logger.info("Starting the processing of anonimization query #{}", counter);
+        long startTime = System.currentTimeMillis();
         List<Tuple> modifiedEvents = liebreExecutor.processAnonymizationQuery(g, inputTuples);
+        logger.info("Finished processing anonymization query #{}, input tuples: {}, output tuples: {}, total time: {}s", counter,
+            inputTuples.size(), modifiedEvents.size(), (System.currentTimeMillis() - startTime) / 1000.0);
 
         double privacyScore;
         // Based on the user choice, calculate the correct privacy metric
@@ -136,27 +142,30 @@ public class EnhancedStreamAnonymizationProblem implements
           default -> privacyScore = privacyMetricCalculator.apply(inputTuples, modifiedEvents);
         }
         qualities.put("privacy", privacyScore);
-        
 
         // Case with empty modified datastream
         if (modifiedEvents.isEmpty()) {
-          qualities.put("privacy", privacyScore);
           qualities.put("semantics", 0.0);
           StreamStatsWindow emptyStats = new StreamStatsWindow(
               mainQueryResults.statsWindow().streamNames(),
               mainQueryResults.statsWindow().minTimestamp(),
               mainQueryResults.statsWindow().maxTimestamp(),
               mainQueryResults.statsWindow().getResolutionMillis());
-          qualities.put("performance-similarity",
+          qualities.put("fidelity",
               fidelityMetricCalculator.apply(mainQueryResults.statsWindow(), emptyStats));
           return qualities;
         }
 
+        logger.info("Starting the processing of modified data on main query #{}", counter);
+        startTime = System.currentTimeMillis();
         QueryResult modifiedOutcome = MainQuery.process(modifiedEvents, queryId, minTs, maxTs);
-        
+        logger.info("Finished processing modified data on main query #{}, input tuples: {}, output tuples: {}, total time: {}s", counter, modifiedEvents.size(), modifiedOutcome.events().size(), (System.currentTimeMillis() - startTime)/1000.0);
+
         StreamStatsWindow modifiedStats = modifiedOutcome.statsWindow();
-        qualities.put("performance-similarity", fidelityMetricCalculator.apply(mainQueryResults.statsWindow(), modifiedStats));
-        qualities.put("semantics", semanticsMetricCalculator.apply(mainQueryResults.events(), modifiedOutcome.events()));
+        qualities.put("fidelity",
+            fidelityMetricCalculator.apply(mainQueryResults.statsWindow(), modifiedStats));
+        qualities.put("semantics",
+            semanticsMetricCalculator.apply(mainQueryResults.events(), modifiedOutcome.events()));
         return qualities;
 
       } catch (Exception e) {

@@ -62,8 +62,8 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
       OperatorRepresentation sinkNode = new Sink("sink");
       g.addNode(sinkNode);
       g.setArcValue(finalNode, sinkNode, ArcType.DEFAULT_ARC);
-      // logger.info("Input tree:\n{}\n", prettyPrintTree(tree));
-      // logger.info("Resulting graph:\n{}\n", prettyPrintGraph(g));
+      logger.info("Input tree:\n{}\n", prettyPrintTree(tree));
+      logger.info("Resulting graph:\n{}\n", prettyPrintGraph(g));
       return g;
     };
   }
@@ -115,31 +115,31 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
 
     switch (specificOpNode.content()) {
       case "<filter>" -> {
-        String id = "" + operatorCounters.merge("Filter", 1, Integer::sum);
+        String id = "F" + operatorCounters.merge("Filter", 1, Integer::sum);
         return addSimpleOperatorStepToGraph(
             parseFilterNode(specificOpNode, id),
             previousNode, g);
       }
       case "<map_duplicate>" -> {
-        String id = "" + operatorCounters.merge("MapDuplicate", 1, Integer::sum);
+        String id = "MD" + operatorCounters.merge("MapDuplicate", 1, Integer::sum);
         return addSimpleOperatorStepToGraph(
             parseMapDuplicateNode(specificOpNode, id),
             previousNode, g);
       }
       case "<map_noise>" -> {
-        String id = "" + operatorCounters.merge("MapNoise", 1, Integer::sum);
+        String id = "MN" + operatorCounters.merge("MapNoise", 1, Integer::sum);
         return addSimpleOperatorStepToGraph(
             parseMapNoiseNode(specificOpNode, id),
             previousNode, g);
       }
       case "<map_rir>" -> {
-        String id = "" + operatorCounters.merge("MapRIR", 1, Integer::sum);
+        String id = "MR" + operatorCounters.merge("MapRIR", 1, Integer::sum);
         return addSimpleOperatorStepToGraph(
             parseMapRIRNode(specificOpNode, id),
             previousNode, g);
       }
       case "<map_aggregate>" -> {
-        String id = "" + operatorCounters.merge("MapAggregate", 1, Integer::sum);
+        String id = "MA" + operatorCounters.merge("MapAggregate", 1, Integer::sum);
         return addSimpleOperatorStepToGraph(
             parseMapAggregateNode(specificOpNode, id),
             previousNode, g);
@@ -220,7 +220,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     Tree<String> leftPipelineNode = specificOpNode.child(0);
     Tree<String> rightPipelineNode = specificOpNode.child(1);
 
-    String forkId = "" + operatorCounters.merge("FORK", 1, Integer::sum);
+    String forkId = "FK" + operatorCounters.merge("Fork", 1, Integer::sum);
 
     OperatorRepresentation forkOp = new Fork(forkId);
     g.addNode(forkOp);
@@ -229,7 +229,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     OperatorRepresentation leftBranch = parsePipelineNode(leftPipelineNode, forkOp, g, operatorCounters);
     OperatorRepresentation rightBranch = parsePipelineNode(rightPipelineNode, forkOp, g, operatorCounters);
 
-    String unionId = "" + operatorCounters.merge("UNION", 1, Integer::sum);
+    String unionId = "U" + operatorCounters.merge("Union", 1, Integer::sum);
 
     OperatorRepresentation joinOp = new Union(unionId);
     g.addNode(joinOp);

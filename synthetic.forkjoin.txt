@@ -4,7 +4,7 @@ ea.experiment(
   runs = (randomGenerator = (seed = [1:1:1]) * [m.defaultRG()]) * [
     ea.run(
       solver = ea.s.nsga2(
-        stop = ea.sc.nOfQualityEvaluations(n = 500);
+        stop = ea.sc.nOfQualityEvaluations(n = 10000);
         representation = ea.r.cfgTree(grammar = ea.grammar.fromFile(
             path = "src/main/resources/grammars/forkjoin.synthetic/forkjoin.synthetic.all.bnf"));
         mapper = anonym.mapper.queryMapper()

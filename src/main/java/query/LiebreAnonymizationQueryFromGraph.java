@@ -1,6 +1,7 @@
 package query;
 
 import common.util.Util;
+import common.util.backoff.InactiveBackoff;
 import component.operator.Operator;
 import component.operator.in1.map.MapFunction;
 import component.sink.Sink;
@@ -33,7 +34,7 @@ public class LiebreAnonymizationQueryFromGraph {
 
         final List<Tuple> collectedEvents = Collections.synchronizedList(new ArrayList<>());
 
-        Query query = new Query();
+        Query query = new Query(100000);
 
         SourceFunction<Tuple> collectionSource = createCollectionSource(inputTuples);
 
@@ -62,25 +63,27 @@ public class LiebreAnonymizationQueryFromGraph {
                     operators.put(m.getID(), query.addMapOperator(m.getID(), m.createMapFunction()));
                 }
                 case mappers.QueryMapper.Fork f -> {
-                    operators.put(f.getID(),
-                            query.addMapOperator(f.getID(), new MapFunction<Tuple, Tuple>() {
-                                @Override
-                                public Tuple apply(Tuple in) {
-                                    return in;
-                                }
+                    operators.put(f.getID(), query.addRouterOperator(f.getID()));
+                    // operators.put(f.getID(),
+                    // query.addMapOperator(f.getID(), new MapFunction<Tuple, Tuple>() {
+                    // @Override
+                    // public Tuple apply(Tuple in) {
+                    // return in;
+                    // }
 
-                            }));
+                    // }));
                 }
                 case mappers.QueryMapper.Union u -> {
-                    operators.put(u.getID(),
-                            query.addMapOperator(u.getID(), new MapFunction<Tuple, Tuple>() {
+                    operators.put(u.getID(), query.addUnionOperator(u.getID()));
+                    // operators.put(u.getID(),
+                    // query.addMapOperator(u.getID(), new MapFunction<Tuple, Tuple>() {
 
-                                @Override
-                                public Tuple apply(Tuple in) {
-                                    return in;
-                                }
+                    // @Override
+                    // public Tuple apply(Tuple in) {
+                    // return in;
+                    // }
 
-                            }));
+                    // }));
                 }
                 case
 
@@ -108,8 +111,10 @@ public class LiebreAnonymizationQueryFromGraph {
         // Now that operators are in place, we place connections. Single in - Single out
         // can be placed immediately, from fork and to union must be "gathered" and than
         // placed.
-        Map<Operator<Tuple, Tuple>, List<Operator<Tuple, Tuple>>> unionSources = new HashMap<>();
-        Map<Operator<Tuple, Tuple>, List<Operator<Tuple, Tuple>>> forkTargets = new HashMap<>();
+        // Map<Operator<Tuple, Tuple>, List<Operator<Tuple, Tuple>>> unionSources = new
+        // HashMap<>();
+        // Map<Operator<Tuple, Tuple>, List<Operator<Tuple, Tuple>>> forkTargets = new
+        // HashMap<>();
         for (Arc<OperatorRepresentation> arc : g.arcs()) {
 
             // If the source id is the actual source, then it is safe to connected it to the
@@ -124,21 +129,32 @@ public class LiebreAnonymizationQueryFromGraph {
                 query.connect(operators.get(arc.source().getID()), sink);
             }
 
-            // If the target is a union, we need to keep track of all the sources that need
-            // to be connected to it, and connect them later, since union can have multiple
-            // sources
             else if (arc.target() instanceof mappers.QueryMapper.Union) {
-                unionSources.computeIfAbsent(operators.get(arc.target().getID()), k -> new ArrayList<>())
-                        .add(operators.get(arc.source().getID()));
+                // Notice we use no backoff for the union!
+                query.connect(operators.get(arc.source().getID()), operators.get(arc.target().getID()), InactiveBackoff.INSTANCE);
             }
 
-            // If the source is a fork, we need to keep track of all the targets that need
-            // to be connected to it, and connect them later, since fork can have multiple
-            // targets
-            else if (arc.source() instanceof mappers.QueryMapper.Fork) {
-                forkTargets.computeIfAbsent(operators.get(arc.source().getID()), k -> new ArrayList<>())
-                        .add(operators.get(arc.target().getID()));
-            }
+            // // If the target is a union, we need to keep track of all the sources that
+            // need
+            // // to be connected to it, and connect them later, since union can have
+            // multiple
+            // // sources
+            // else if (arc.target() instanceof mappers.QueryMapper.Union) {
+            // unionSources.computeIfAbsent(operators.get(arc.target().getID()), k -> new
+            // ArrayList<>())
+            // .add(operators.get(arc.source().getID()));
+            // }
+
+            // // If the source is a fork, we need to keep track of all the targets that
+            // need
+            // // to be connected to it, and connect them later, since fork can have
+            // multiple
+            // // targets
+            // else if (arc.source() instanceof mappers.QueryMapper.Fork) {
+            // forkTargets.computeIfAbsent(operators.get(arc.source().getID()), k -> new
+            // ArrayList<>())
+            // .add(operators.get(arc.target().getID()));
+            // }
 
             // In the other cases, we can connect the source and target operator immediately
             else {
@@ -146,20 +162,28 @@ public class LiebreAnonymizationQueryFromGraph {
             }
         }
 
-        // Connect unions to their sources
-        for (Map.Entry<Operator<Tuple, Tuple>, List<Operator<Tuple, Tuple>>> entry : unionSources.entrySet()) {
-            query.connect(entry.getValue(), entry.getKey());
-        }
+        // // Connect unions to their sources
+        // for (Map.Entry<Operator<Tuple, Tuple>, List<Operator<Tuple, Tuple>>> entry :
+        // unionSources.entrySet()) {
+        // query.connect(entry.getValue(), entry.getKey());
+        // }
 
-        // Connect forks to their targets
-        for (Map.Entry<Operator<Tuple, Tuple>, List<Operator<Tuple, Tuple>>> entry : forkTargets.entrySet()) {
-            query.connect(List.of(entry.getKey()), entry.getValue());
-        }
+        // // Connect forks to their targets
+        // for (Map.Entry<Operator<Tuple, Tuple>, List<Operator<Tuple, Tuple>>> entry :
+        // forkTargets.entrySet()) {
+        // query.connect(List.of(entry.getKey()), entry.getValue());
+        // }
         query.activate();
 
+        int numberOfWaitIterations = 0;
         while (sink.isEnabled()) {
             try {
                 Thread.sleep(10);
+                numberOfWaitIterations++;
+                if (numberOfWaitIterations % 500 == 0) {
+                    QueryGraphExporter.printFlushingState(query);
+                }
+
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }

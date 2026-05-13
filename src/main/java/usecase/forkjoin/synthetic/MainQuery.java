@@ -1,8 +1,11 @@
 package usecase.forkjoin.synthetic;
 
 import common.util.Util;
+import common.util.backoff.InactiveBackoff;
 import component.operator.Operator;
 import component.operator.in1.map.MapFunction;
+import component.operator.router.RouterOperator;
+import component.operator.union.UnionOperator;
 import component.sink.Sink;
 import component.source.Source;
 import component.source.SourceFunction;
@@ -33,22 +36,24 @@ public class MainQuery {
                 minTs, maxTs, resolution);
 
         final List<Tuple> collectedEvents = Collections.synchronizedList(new ArrayList<>());
-        Query query = new Query();
+        Query query = new Query(100000);
 
         // Create and add a source that reads from the provided in-memory list
         SourceFunction<Tuple> collectionSource = createCollectionSource(inputStream);
-        Source<Tuple> inputSource = query.addBaseSource("I1_" + queryId, collectionSource);
+        Source<Tuple> inputSource = query.addBaseSource("I1-" + queryId, collectionSource);
+
+        RouterOperator<Tuple> router = query.addRouterOperator("router-" + queryId);
 
         // Filter for branch 1
         Operator<Tuple, Tuple> b1f = query.addFilterOperator(
-                "b1f_" + queryId,
+                "b1f-" + queryId,
                 tuple -> {
                     return (tuple.getField("f1") >= filter1min && tuple.getField("f1") <= filter1max);
                 });
 
         // Filter for branch 2
         Operator<Tuple, Tuple> b2f = query.addFilterOperator(
-                "b2f_" + queryId,
+                "b2f-" + queryId,
                 tuple -> {
                     return (tuple.getField("f2") >= filter2min && tuple.getField("f2") <= filter2max);
                 });
@@ -80,24 +85,30 @@ public class MainQuery {
         }
 
         // Create performance recorder operators for each stage
-        Operator<Tuple, Tuple> recorderAfterSource = query.addMapOperator("rec_s_" + queryId,
+        Operator<Tuple, Tuple> recorderAfterSource = query.addMapOperator("rec-s-" + queryId,
                 new InnerPerformanceRecorder("sourceStream", statsWindow));
-        Operator<Tuple, Tuple> recorderAfterBranch1 = query.addMapOperator("rec_b1_" + queryId,
+        Operator<Tuple, Tuple> recorderAfterBranch1 = query.addMapOperator("rec-b1-" + queryId,
                 new InnerPerformanceRecorder("branch1filter", statsWindow));
-        Operator<Tuple, Tuple> recorderAfterBranch2 = query.addMapOperator("rec_b2_" + queryId,
+        Operator<Tuple, Tuple> recorderAfterBranch2 = query.addMapOperator("rec-b2-" + queryId,
                 new InnerPerformanceRecorder("branch2filter", statsWindow));
 
+        UnionOperator<Tuple> union = query.addUnionOperator("union-"+queryId);
+
         // Final Sink that adds every valid event to the results list
-        Sink<Tuple> sink = query.addBaseSink("o1_" + queryId, event -> {
+        Sink<Tuple> sink = query.addBaseSink("o1-" + queryId, event -> {
             collectedEvents.add(event);
         });
 
         // Connect the pipeline components
         query.connect(inputSource, recorderAfterSource)
-                .connect(List.of(recorderAfterSource), List.of(b1f, b2f))
+                .connect(recorderAfterSource, router)
+                .connect(router, b1f)
+                .connect(router, b2f)
                 .connect(b1f, recorderAfterBranch1)
                 .connect(b2f, recorderAfterBranch2)
-                .connect(List.of(recorderAfterBranch1, recorderAfterBranch2), sink);
+                .connect(recorderAfterBranch1, union, InactiveBackoff.INSTANCE)
+                .connect(recorderAfterBranch2, union, InactiveBackoff.INSTANCE)
+                .connect(union, sink);
 
         query.activate();
 
