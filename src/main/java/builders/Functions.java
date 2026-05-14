@@ -16,26 +16,27 @@
 
 package builders;
 
+import io.github.ericmedvet.jgea.core.representation.graph.Graph;
 import io.github.ericmedvet.jnb.core.Cacheable;
 import io.github.ericmedvet.jnb.core.Discoverable;
-import mappers.Mapper;
-import mappers.QueryMapper;
+import io.github.ericmedvet.jnb.core.Param;
+import io.github.ericmedvet.jnb.datastructure.NamedFunction;
+import java.util.function.Function;
 
-@Discoverable(prefixTemplate = "anonym.mapper")
-public class MapperBuilder {
+@Discoverable(prefixTemplate = "anonym.function|f")
+public class Functions {
 
-    private MapperBuilder() {
-    }
+  private Functions() {
+  }
 
-    // Create a Mapper
-    @SuppressWarnings("unused")
-    @Cacheable
-    public static Mapper treeToQueryMapper(){
-        return new Mapper();
-    }
+  @Cacheable
+  public static <X, N, A> NamedFunction<X, Integer> graphBu(
+      @Param(value = "name", dS = "graph.bu") String name,
+      @Param(value = "of", dNPM = "f.identity()") Function<X, Graph<N,A>> beforeF
+  ) {
+    Function<Graph<N,A>, Integer> f = g -> g.size();
+    return NamedFunction.from(f, name).compose(beforeF);
+  }
 
-    @Cacheable
-    public static QueryMapper queryMapper() {
-        return new QueryMapper();
-    }
+
 }

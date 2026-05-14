@@ -26,9 +26,9 @@ import problem.StreamAnonymizationProblem_2ObjectivesRes;
 import problem.utils.PrivacyMetricChoice;
 
 @Discoverable(prefixTemplate = "anonym.problem")
-public class ProblemBuilder {
+public class Problems {
 
-    private ProblemBuilder() {
+    private Problems() {
     }
 
     // Create a problem with 3 objectives
