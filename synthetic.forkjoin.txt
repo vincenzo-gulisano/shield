@@ -3,7 +3,7 @@ $basePath = ''outputs/{^^.name}/{^^.startTime}/''
 ea.experiment(
   runs = (randomGenerator = (seed = [1:1:1])
     * [m.defaultRG()])
-    * (solver = (stop = [stop = ea.sc.nOfQualityEvaluations(n = 1000)])
+    * (solver = (stop = ea.sc.nOfQualityEvaluations(n = 1000))
     * [
       ea.s.mapElites(
         representation = ea.r.cfgTree(grammar = ea.grammar.fromFile(
