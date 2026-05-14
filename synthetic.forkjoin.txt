@@ -11,12 +11,12 @@ ea.experiment(
       );
       problem = anonym.problem.enhancedStreamAnonymizationProblem(
         inputCsvPath = "datasets/synthetic.forkjointest.csv";
-        fitnessEvaluations = 1000;
         privacyMetric = K_ANONYMITY_CARDINALITY_Q99
       )
     )
   ];
   listeners = [
+    anonym.l.liebreTerminator();
     ea.l.console(eFunctions = [
       ea.f.size(of = ea.f.genotype(of = ea.f.best()); format = "%3d")
     ]);

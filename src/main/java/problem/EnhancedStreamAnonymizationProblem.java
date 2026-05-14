@@ -19,7 +19,6 @@ package problem;
 import io.github.ericmedvet.jgea.core.distance.Distance;
 import io.github.ericmedvet.jgea.core.problem.SimpleMOProblem;
 import io.github.ericmedvet.jgea.core.representation.graph.Graph;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -33,24 +32,17 @@ import java.util.SequencedMap;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import event.GenericEvent;
 import mappers.QueryMapper.ArcType;
 import mappers.QueryMapper.OperatorRepresentation;
 import metrics.performance.PerformanceSimilarity;
 import metrics.performance.utils.StreamStatsWindow;
 import metrics.privacy.KAnonymityPrivacyCardinality;
 import metrics.results.F1Score;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import problem.utils.PrivacyMetricChoice;
-import query.LiebreAnonymizationQuery;
 import query.LiebreAnonymizationQueryFromGraph;
 import query.LiebreContext;
-import query.MainQueryAirQuality;
-import query.MainQueryGeoLife;
-import query.MainQueryResult;
 import usecase.common.Tuple;
 import usecase.forkjoin.synthetic.MainQuery;
 import usecase.forkjoin.synthetic.MainQuery.QueryResult;
@@ -62,7 +54,6 @@ public class EnhancedStreamAnonymizationProblem implements
 
   // Define a static counter for unique query ID
   private static final AtomicLong queryCounter = new AtomicLong(0);
-  private final AtomicLong fitnessEvaluationsCounter;
 
   static {
     // Notify the Terminator not to end after the first query has completed
@@ -78,13 +69,12 @@ public class EnhancedStreamAnonymizationProblem implements
 
   private final List<Tuple> inputTuples;
 
-  public EnhancedStreamAnonymizationProblem(String inputCsvPath, int fitnessEvaluations,
+  public EnhancedStreamAnonymizationProblem(String inputCsvPath,
       PrivacyMetricChoice privacyMetric) {
 
     logger.info(
-        "Initializing the EnhancedStreamAnonymizationProblem with input CSV: {}, fitness evaluations: {}, and privacy metric: {}",
-        inputCsvPath, fitnessEvaluations, privacyMetric);
-    fitnessEvaluationsCounter = new AtomicLong(fitnessEvaluations);
+        "Initializing the EnhancedStreamAnonymizationProblem with input CSV: {}, and privacy metric: {}",
+        inputCsvPath, privacyMetric);
 
     logger.info("Loading input tuples from {}", inputCsvPath);
     inputTuples = loadTuples(inputCsvPath);
@@ -93,7 +83,8 @@ public class EnhancedStreamAnonymizationProblem implements
     this.minTs = inputTuples.getFirst().getTimestamp();
     this.maxTs = inputTuples.getLast().getTimestamp();
     this.mainQueryResults = MainQuery.process(inputTuples, "main", minTs, maxTs);
-    logger.info("Main query executed successfully, returning {} results, and the following metrics:\n{}",
+    logger.info(
+        "Main query executed successfully, returning {} results, and the following metrics:\n{}",
         mainQueryResults.events().size(), mainQueryResults.statsWindow());
 
     this.privacyMetricChoice = privacyMetric;
@@ -104,7 +95,8 @@ public class EnhancedStreamAnonymizationProblem implements
 
     logger.info("Empty query privacy, fidelity, and semantics scores: {}, {}, and {}",
         privacyMetricCalculator.applyWithQuantile99(inputTuples, inputTuples),
-        fidelityMetricCalculator.apply(mainQueryResults.statsWindow(), mainQueryResults.statsWindow()),
+        fidelityMetricCalculator.apply(mainQueryResults.statsWindow(),
+            mainQueryResults.statsWindow()),
         semanticsMetricCalculator.apply(mainQueryResults.events(), mainQueryResults.events()));
 
   }
@@ -120,6 +112,45 @@ public class EnhancedStreamAnonymizationProblem implements
     return OBJECTIVES;
   }
 
+  private List<Tuple> loadTuples(String inputCsvPath) {
+    List<Tuple> tuples = new ArrayList<>();
+    InputStream is = getClass().getClassLoader().getResourceAsStream(inputCsvPath);
+    try (BufferedReader reader = new BufferedReader(
+        new InputStreamReader(is, StandardCharsets.UTF_8));) {
+      String line;
+      while ((line = reader.readLine()) != null) {
+        line = line.trim();
+        if (line.isEmpty()) {
+          continue;
+        }
+
+        String[] parts = line.split(",");
+        if (parts.length != 3) {
+          throw new IllegalArgumentException(
+              "Expected 3 CSV columns at line " + line + " in " + inputCsvPath + ", found "
+                  + parts.length);
+        }
+
+        try {
+          long timestamp = Long.parseLong(parts[0].trim());
+          double f1 = Double.parseDouble(parts[1].trim());
+          double f2 = Double.parseDouble(parts[2].trim());
+          tuples.add(new Tuple(timestamp, f1, f2));
+        } catch (NumberFormatException e) {
+          throw new IllegalArgumentException(
+              "Invalid tuple values at line " + line + " in " + inputCsvPath, e);
+        }
+      }
+    } catch (IOException e) {
+      throw new IllegalArgumentException("Cannot read input CSV: " + inputCsvPath, e);
+    }
+    return tuples;
+  }
+
+  /*
+   * The remaining part contains only helper functions
+   */
+
   @Override
   public Function<Graph<OperatorRepresentation, ArcType>, SequencedMap<String, Double>> qualityFunction() {
     return g -> {
@@ -134,19 +165,22 @@ public class EnhancedStreamAnonymizationProblem implements
         logger.info("Starting the processing of anonimization query #{}", counter);
         long startTime = System.currentTimeMillis();
         List<Tuple> modifiedEvents = liebreExecutor.processAnonymizationQuery(g, inputTuples);
-        logger.info("Finished processing anonymization query #{}, input tuples: {}, output tuples: {}, total time: {}s",
+        logger.info(
+            "Finished processing anonymization query #{}, input tuples: {}, output tuples: {}, total time: {}s",
             counter,
-            inputTuples.size(), modifiedEvents.size(), (System.currentTimeMillis() - startTime) / 1000.0);
+            inputTuples.size(), modifiedEvents.size(),
+            (System.currentTimeMillis() - startTime) / 1000.0);
 
         double privacyScore;
         // Based on the user choice, calculate the correct privacy metric
         switch (privacyMetricChoice) {
           case K_ANONYMITY_CARDINALITY_MAX ->
-            privacyScore = privacyMetricCalculator.applyWithMax(inputTuples, modifiedEvents);
+              privacyScore = privacyMetricCalculator.applyWithMax(inputTuples, modifiedEvents);
           case K_ANONYMITY_CARDINALITY_Q99 ->
-            privacyScore = privacyMetricCalculator.applyWithQuantile99(inputTuples, modifiedEvents);
+              privacyScore = privacyMetricCalculator.applyWithQuantile99(inputTuples,
+                  modifiedEvents);
           case K_ANONYMITY_CARDINALITY ->
-            privacyScore = privacyMetricCalculator.apply(inputTuples, modifiedEvents);
+              privacyScore = privacyMetricCalculator.apply(inputTuples, modifiedEvents);
           default -> privacyScore = privacyMetricCalculator.apply(inputTuples, modifiedEvents);
         }
         qualities.put("privacy", privacyScore);
@@ -179,53 +213,12 @@ public class EnhancedStreamAnonymizationProblem implements
               semanticsMetricCalculator.apply(mainQueryResults.events(), modifiedOutcome.events()));
 
         }
-        fitnessEvaluationsCounter.decrementAndGet();
-        if (fitnessEvaluationsCounter.get() == 0) {
-          logger.info("Reached the maximum number of fitness evaluations ({}), terminating the program.", fitnessEvaluationsCounter.get());
-          LiebreContext.interruptTerminator();
-        }
         return qualities;
 
       } catch (Exception e) {
         throw new RuntimeException("Error executing query " + queryId + " for graph " + g, e);
       }
     };
-  }
-
-  /*
-   * The remaining part contains only helper functions
-   */
-
-  private List<Tuple> loadTuples(String inputCsvPath) {
-    List<Tuple> tuples = new ArrayList<>();
-    InputStream is = getClass().getClassLoader().getResourceAsStream(inputCsvPath);
-    try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));) {
-      String line;
-      while ((line = reader.readLine()) != null) {
-        line = line.trim();
-        if (line.isEmpty()) {
-          continue;
-        }
-
-        String[] parts = line.split(",");
-        if (parts.length != 3) {
-          throw new IllegalArgumentException(
-              "Expected 3 CSV columns at line " + line + " in " + inputCsvPath + ", found " + parts.length);
-        }
-
-        try {
-          long timestamp = Long.parseLong(parts[0].trim());
-          double f1 = Double.parseDouble(parts[1].trim());
-          double f2 = Double.parseDouble(parts[2].trim());
-          tuples.add(new Tuple(timestamp, f1, f2));
-        } catch (NumberFormatException e) {
-          throw new IllegalArgumentException("Invalid tuple values at line " + line + " in " + inputCsvPath, e);
-        }
-      }
-    } catch (IOException e) {
-      throw new IllegalArgumentException("Cannot read input CSV: " + inputCsvPath, e);
-    }
-    return tuples;
   }
 
 }
