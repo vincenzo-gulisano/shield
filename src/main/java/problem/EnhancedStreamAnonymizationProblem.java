@@ -62,6 +62,7 @@ public class EnhancedStreamAnonymizationProblem implements
 
   // Define a static counter for unique query ID
   private static final AtomicLong queryCounter = new AtomicLong(0);
+  private final AtomicLong fitnessEvaluationsCounter;
 
   static {
     // Notify the Terminator not to end after the first query has completed
@@ -77,7 +78,13 @@ public class EnhancedStreamAnonymizationProblem implements
 
   private final List<Tuple> inputTuples;
 
-  public EnhancedStreamAnonymizationProblem(String inputCsvPath, PrivacyMetricChoice privacyMetric) {
+  public EnhancedStreamAnonymizationProblem(String inputCsvPath, int fitnessEvaluations,
+      PrivacyMetricChoice privacyMetric) {
+
+    logger.info(
+        "Initializing the EnhancedStreamAnonymizationProblem with input CSV: {}, fitness evaluations: {}, and privacy metric: {}",
+        inputCsvPath, fitnessEvaluations, privacyMetric);
+    fitnessEvaluationsCounter = new AtomicLong(fitnessEvaluations);
 
     logger.info("Loading input tuples from {}", inputCsvPath);
     inputTuples = loadTuples(inputCsvPath);
@@ -127,7 +134,8 @@ public class EnhancedStreamAnonymizationProblem implements
         logger.info("Starting the processing of anonimization query #{}", counter);
         long startTime = System.currentTimeMillis();
         List<Tuple> modifiedEvents = liebreExecutor.processAnonymizationQuery(g, inputTuples);
-        logger.info("Finished processing anonymization query #{}, input tuples: {}, output tuples: {}, total time: {}s", counter,
+        logger.info("Finished processing anonymization query #{}, input tuples: {}, output tuples: {}, total time: {}s",
+            counter,
             inputTuples.size(), modifiedEvents.size(), (System.currentTimeMillis() - startTime) / 1000.0);
 
         double privacyScore;
@@ -153,19 +161,29 @@ public class EnhancedStreamAnonymizationProblem implements
               mainQueryResults.statsWindow().getResolutionMillis());
           qualities.put("fidelity",
               fidelityMetricCalculator.apply(mainQueryResults.statsWindow(), emptyStats));
-          return qualities;
+
+        } else {
+
+          logger.info("Starting the processing of modified data on main query #{}", counter);
+          startTime = System.currentTimeMillis();
+          QueryResult modifiedOutcome = MainQuery.process(modifiedEvents, queryId, minTs, maxTs);
+          logger.info(
+              "Finished processing modified data on main query #{}, input tuples: {}, output tuples: {}, total time: {}s",
+              counter, modifiedEvents.size(), modifiedOutcome.events().size(),
+              (System.currentTimeMillis() - startTime) / 1000.0);
+
+          StreamStatsWindow modifiedStats = modifiedOutcome.statsWindow();
+          qualities.put("fidelity",
+              fidelityMetricCalculator.apply(mainQueryResults.statsWindow(), modifiedStats));
+          qualities.put("semantics",
+              semanticsMetricCalculator.apply(mainQueryResults.events(), modifiedOutcome.events()));
+
         }
-
-        logger.info("Starting the processing of modified data on main query #{}", counter);
-        startTime = System.currentTimeMillis();
-        QueryResult modifiedOutcome = MainQuery.process(modifiedEvents, queryId, minTs, maxTs);
-        logger.info("Finished processing modified data on main query #{}, input tuples: {}, output tuples: {}, total time: {}s", counter, modifiedEvents.size(), modifiedOutcome.events().size(), (System.currentTimeMillis() - startTime)/1000.0);
-
-        StreamStatsWindow modifiedStats = modifiedOutcome.statsWindow();
-        qualities.put("fidelity",
-            fidelityMetricCalculator.apply(mainQueryResults.statsWindow(), modifiedStats));
-        qualities.put("semantics",
-            semanticsMetricCalculator.apply(mainQueryResults.events(), modifiedOutcome.events()));
+        fitnessEvaluationsCounter.decrementAndGet();
+        if (fitnessEvaluationsCounter.get() == 0) {
+          logger.info("Reached the maximum number of fitness evaluations ({}), terminating the program.", fitnessEvaluationsCounter.get());
+          LiebreContext.interruptTerminator();
+        }
         return qualities;
 
       } catch (Exception e) {

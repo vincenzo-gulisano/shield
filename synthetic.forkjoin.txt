@@ -4,13 +4,14 @@ ea.experiment(
   runs = (randomGenerator = (seed = [1:1:1]) * [m.defaultRG()]) * [
     ea.run(
       solver = ea.s.nsga2(
-        stop = ea.sc.nOfQualityEvaluations(n = 10000);
+        stop = ea.sc.nOfQualityEvaluations(n = 1000);
         representation = ea.r.cfgTree(grammar = ea.grammar.fromFile(
             path = "src/main/resources/grammars/forkjoin.synthetic/forkjoin.synthetic.all.bnf"));
         mapper = anonym.mapper.queryMapper()
       );
       problem = anonym.problem.enhancedStreamAnonymizationProblem(
         inputCsvPath = "datasets/synthetic.forkjointest.csv";
+        fitnessEvaluations = 1000;
         privacyMetric = K_ANONYMITY_CARDINALITY_Q99
       )
     )
@@ -54,7 +55,7 @@ ea.experiment(
       ]
     );
     ea.l.savePlotForRun(
-      path = $basePath + "scatter-performance-vs-results-{randomGenerator.seed:%03d}.svg";
+      path = $basePath + "scatter-fidelity-vs-semantics-{randomGenerator.seed:%03d}.svg";
       plot = ea.plot.single.biObjectivePopulation(
         x = f.mapValue(key = "fidelity"; of = ea.f.quality());
         y = f.mapValue(key = "semantics"; of = ea.f.quality())
@@ -64,7 +65,7 @@ ea.experiment(
       type = svg
     );
     ea.l.savePlotForRun(
-      path = $basePath + "scatter-privacy-vs-results-{randomGenerator.seed:%03d}.svg";
+      path = $basePath + "scatter-privacy-vs-semantics-{randomGenerator.seed:%03d}.svg";
       plot = ea.plot.single.biObjectivePopulation(
         x = f.mapValue(key = privacy; of = ea.f.quality());
         y = f.mapValue(key = "semantics"; of = ea.f.quality())
@@ -74,7 +75,7 @@ ea.experiment(
       type = svg
     );
     ea.l.savePlotForRun(
-      path = $basePath + "scatter-performance-vs-privacy-{randomGenerator.seed:%03d}.svg";
+      path = $basePath + "scatter-fidelity-vs-privacy-{randomGenerator.seed:%03d}.svg";
       plot = ea.plot.single.biObjectivePopulation(
         x = f.mapValue(key = "fidelity"; of = ea.f.quality());
         y = f.mapValue(key = privacy; of = ea.f.quality())
@@ -84,7 +85,7 @@ ea.experiment(
       type = svg
     );
     ea.l.savePlotForExp(
-      path = $basePath + "p75privacy-results.svg";
+      path = $basePath + "p75privacy-semantics.svg";
       plot = ea.plot.multi.xyExp(
         y = f.mapValue(key = "semantics"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality()))))
       );
@@ -92,7 +93,7 @@ ea.experiment(
       type = svg
     );
     ea.l.savePlotForExp(
-      path = $basePath + "p75privacy-performance.svg";
+      path = $basePath + "p75privacy-fidelity.svg";
       plot = ea.plot.multi.xyExp(
         y = f.mapValue(key = "fidelity"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality()))))
       );
@@ -100,7 +101,7 @@ ea.experiment(
       type = svg
     );
     ea.l.savePlotForExp(
-      path = $basePath + "p75results-privacy.svg";
+      path = $basePath + "p75semantics-privacy.svg";
       plot = ea.plot.multi.xyExp(
         y = f.mapValue(key = "privacy"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "semantics"; of = ea.f.quality()))))
       );
@@ -108,7 +109,7 @@ ea.experiment(
       type = svg
     );
     ea.l.savePlotForExp(
-      path = $basePath + "p75results-performance.svg";
+      path = $basePath + "p75semantics-fidelity.svg";
       plot = ea.plot.multi.xyExp(
         y = f.mapValue(key = "fidelity"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "semantics"; of = ea.f.quality()))))
       );
@@ -116,7 +117,7 @@ ea.experiment(
       type = svg
     );
     ea.l.savePlotForExp(
-      path = $basePath + "p75performance-privacy.svg";
+      path = $basePath + "p75fidelity-privacy.svg";
       plot = ea.plot.multi.xyExp(
         y = f.mapValue(key = privacy; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "fidelity"; of = ea.f.quality()))))
       );
@@ -124,7 +125,7 @@ ea.experiment(
       type = svg
     );
     ea.l.savePlotForExp(
-      path = $basePath + "p75performance-results.svg";
+      path = $basePath + "p75fidelity-semantics.svg";
       plot = ea.plot.multi.xyExp(
         y = f.mapValue(key = "semantics"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "fidelity"; of = ea.f.quality()))))
       );

@@ -47,11 +47,12 @@ public class ProblemBuilder {
     @Cacheable
     public static EnhancedStreamAnonymizationProblem enhancedStreamAnonymizationProblem(
             @Param("inputCsvPath") String inputCsvPath,
+            @Param("fitnessEvaluations") int fitnessEvaluations,
             @Param(value = "privacyMetric", dS = "K_ANONYMITY_CARDINALITY") PrivacyMetricChoice privacyMetric,
             @Param(value = "name", iS = "{inputCsvPath}") String name) {
 
         // TODO add more parameters, e.g. to specify which ops to use without changing grammar
-        return new EnhancedStreamAnonymizationProblem(inputCsvPath, privacyMetric);
+        return new EnhancedStreamAnonymizationProblem(inputCsvPath, fitnessEvaluations, privacyMetric);
     }
 
     // Create a problem with 3 objectives
