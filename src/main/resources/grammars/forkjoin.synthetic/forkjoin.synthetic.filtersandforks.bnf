@@ -1,0 +1,8 @@
+<pipeline> ::= <operator> | <operator> <pipeline>
+<operator> ::= <filter> | <fork_ops_join>
+<filter> ::= <attribute> <condition> <value>
+<fork_ops_join> ::= <pipeline> <pipeline>
+<attribute> ::= f1 | f2
+<condition> ::= lt | gt
+<value> ::= <dig> <dig> <dig> <dig> <dig> . <dig> <dig>
+<dig> ::= 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
