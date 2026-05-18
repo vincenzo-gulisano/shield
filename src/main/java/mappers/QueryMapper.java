@@ -407,4 +407,91 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     }
   }
 
+  public static FilterOperator parseFilterOperatorFromString(String representation) {
+    Map<String, String> params = parseOperatorParams(representation, "FilterOperator");
+    return new FilterOperator(
+        requiredParam(params, "id", representation),
+        requiredParam(params, "field", representation),
+        requiredParam(params, "condition", representation),
+        Double.parseDouble(requiredParam(params, "value", representation)));
+  }
+
+  public static MapDuplicate parseMapDuplicateFromString(String representation) {
+    Map<String, String> params = parseOperatorParams(representation, "MapDuplicate");
+    return new MapDuplicate(
+        requiredParam(params, "id", representation),
+        Double.parseDouble(requiredParam(params, "probability", representation)));
+  }
+
+  public static MapNoise parseMapNoiseFromString(String representation) {
+    Map<String, String> params = parseOperatorParams(representation, "MapNoise");
+    return new MapNoise(
+        requiredParam(params, "id", representation),
+        requiredParam(params, "field", representation),
+        Double.parseDouble(requiredParam(params, "probability", representation)));
+  }
+
+  public static MapRIR parseMapRIRFromString(String representation) {
+    Map<String, String> params = parseOperatorParams(representation, "MapRIR");
+    return new MapRIR(
+        requiredParam(params, "id", representation),
+        requiredParam(params, "field", representation));
+  }
+
+  public static MapAggregate parseMapAggregateFromString(String representation) {
+    Map<String, String> params = parseOperatorParams(representation, "MapAggregate");
+    return new MapAggregate(
+        requiredParam(params, "id", representation),
+        requiredParam(params, "field", representation),
+        MapAggregateAggregatorFunction.valueOf(requiredParam(params, "aggFunction", representation)),
+        Integer.parseInt(requiredParam(params, "windowSize", representation)));
+  }
+
+  public static Fork parseForkFromString(String representation) {
+    return new Fork(requiredParam(parseOperatorParams(representation, "Fork"), "id", representation));
+  }
+
+  public static Union parseUnionFromString(String representation) {
+    return new Union(requiredParam(parseOperatorParams(representation, "Union"), "id", representation));
+  }
+
+  public static Source parseSourceFromString(String representation) {
+    return new Source(requiredParam(parseOperatorParams(representation, "Source"), "id", representation));
+  }
+
+  public static Sink parseSinkFromString(String representation) {
+    return new Sink(requiredParam(parseOperatorParams(representation, "Sink"), "id", representation));
+  }
+
+  private static Map<String, String> parseOperatorParams(String representation, String expectedOperatorName) {
+    String prefix = expectedOperatorName + "[";
+    if (!representation.startsWith(prefix) || !representation.endsWith("]")) {
+      throw new IllegalArgumentException(
+          "Expected " + expectedOperatorName + "[...] representation, found: " + representation);
+    }
+
+    Map<String, String> params = new HashMap<>();
+    String paramsString = representation.substring(prefix.length(), representation.length() - 1);
+    if (paramsString.isBlank()) {
+      return params;
+    }
+
+    for (String param : paramsString.split(",")) {
+      String[] keyValue = param.trim().split("=", 2);
+      if (keyValue.length != 2) {
+        throw new IllegalArgumentException("Malformed parameter '" + param + "' in: " + representation);
+      }
+      params.put(keyValue[0].trim(), keyValue[1].trim());
+    }
+    return params;
+  }
+
+  private static String requiredParam(Map<String, String> params, String name, String representation) {
+    String value = params.get(name);
+    if (value == null) {
+      throw new IllegalArgumentException("Missing parameter '" + name + "' in: " + representation);
+    }
+    return value;
+  }
+
 }
