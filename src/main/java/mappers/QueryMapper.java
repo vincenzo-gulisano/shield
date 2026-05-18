@@ -21,7 +21,9 @@ import io.github.ericmedvet.jgea.core.representation.graph.Graph;
 import io.github.ericmedvet.jgea.core.representation.graph.LinkedHashGraph;
 import io.github.ericmedvet.jgea.core.representation.tree.Tree;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -407,6 +409,71 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     }
   }
 
+  public static Graph<OperatorRepresentation, ArcType> parseGraphFromString(String representation) {
+    String graphString = String.join(" ", representation.trim().split("\\s+"));
+    int nodesStart = graphString.indexOf("nodes=[");
+    int arcsStart = graphString.indexOf("], arcs={");
+    if (nodesStart < 0 || arcsStart < 0) {
+      throw new IllegalArgumentException("Expected graph string with nodes=[...] and arcs={...}: " + representation);
+    }
+
+    String nodesString = graphString.substring(nodesStart + "nodes=[".length(), arcsStart);
+    int arcsContentStart = arcsStart + "], arcs={".length();
+    int arcsContentEnd = graphString.endsWith("}}") ? graphString.length() - 2 : graphString.length() - 1;
+    if (arcsContentEnd < arcsContentStart) {
+      throw new IllegalArgumentException("Malformed arcs section in graph string: " + representation);
+    }
+    String arcsString = graphString.substring(arcsContentStart, arcsContentEnd);
+
+    Graph<OperatorRepresentation, ArcType> graph = new LinkedHashGraph<>();
+    Map<String, OperatorRepresentation> nodesByRepresentation = new HashMap<>();
+    for (String nodeString : splitTopLevel(nodesString, ',')) {
+      OperatorRepresentation node = parseOperatorRepresentationFromString(nodeString);
+      nodesByRepresentation.put(nodeString, node);
+      graph.addNode(node);
+    }
+
+    if (!arcsString.isBlank()) {
+      for (String arcString : splitTopLevel(arcsString, ',')) {
+        int arrowIndex = arcString.indexOf("->");
+        int valueIndex = arcString.lastIndexOf('=');
+        if (arrowIndex < 0 || valueIndex < 0 || valueIndex < arrowIndex) {
+          throw new IllegalArgumentException("Malformed arc representation: " + arcString);
+        }
+
+        String sourceString = arcString.substring(0, arrowIndex).trim();
+        String targetString = arcString.substring(arrowIndex + 2, valueIndex).trim();
+        ArcType arcType = ArcType.valueOf(arcString.substring(valueIndex + 1).trim());
+
+        OperatorRepresentation source = nodesByRepresentation.computeIfAbsent(sourceString,
+            QueryMapper::parseOperatorRepresentationFromString);
+        OperatorRepresentation target = nodesByRepresentation.computeIfAbsent(targetString,
+            QueryMapper::parseOperatorRepresentationFromString);
+        graph.addNode(source);
+        graph.addNode(target);
+        graph.setArcValue(source, target, arcType);
+      }
+    }
+
+    return graph;
+  }
+
+  public static OperatorRepresentation parseOperatorRepresentationFromString(String representation) {
+    String operatorName = representation.substring(0, representation.indexOf('['));
+    return switch (operatorName) {
+      case "FilterOperator" -> parseFilterOperatorFromString(representation);
+      case "MapDuplicate" -> parseMapDuplicateFromString(representation);
+      case "MapNoise" -> parseMapNoiseFromString(representation);
+      case "MapRIR" -> parseMapRIRFromString(representation);
+      case "MapAggregate" -> parseMapAggregateFromString(representation);
+      case "Fork" -> parseForkFromString(representation);
+      case "Union" -> parseUnionFromString(representation);
+      case "Source" -> parseSourceFromString(representation);
+      case "Sink" -> parseSinkFromString(representation);
+      default -> throw new IllegalArgumentException("Unknown operator representation: " + representation);
+    };
+  }
+
   public static FilterOperator parseFilterOperatorFromString(String representation) {
     Map<String, String> params = parseOperatorParams(representation, "FilterOperator");
     return new FilterOperator(
@@ -484,6 +551,32 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
       params.put(keyValue[0].trim(), keyValue[1].trim());
     }
     return params;
+  }
+
+  private static List<String> splitTopLevel(String text, char separator) {
+    List<String> parts = new ArrayList<>();
+    int start = 0;
+    int depth = 0;
+    for (int i = 0; i < text.length(); i++) {
+      char c = text.charAt(i);
+      if (c == '[' || c == '{' || c == '(') {
+        depth++;
+      } else if (c == ']' || c == '}' || c == ')') {
+        depth--;
+      } else if (c == separator && depth == 0) {
+        addNonBlankPart(parts, text.substring(start, i));
+        start = i + 1;
+      }
+    }
+    addNonBlankPart(parts, text.substring(start));
+    return parts;
+  }
+
+  private static void addNonBlankPart(List<String> parts, String part) {
+    String trimmed = part.trim();
+    if (!trimmed.isEmpty()) {
+      parts.add(trimmed);
+    }
   }
 
   private static String requiredParam(Map<String, String> params, String name, String representation) {
