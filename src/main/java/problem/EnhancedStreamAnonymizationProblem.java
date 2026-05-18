@@ -24,6 +24,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -114,9 +116,7 @@ public class EnhancedStreamAnonymizationProblem implements
 
   private List<Tuple> loadTuples(String inputCsvPath) {
     List<Tuple> tuples = new ArrayList<>();
-    InputStream is = getClass().getClassLoader().getResourceAsStream(inputCsvPath);
-    try (BufferedReader reader = new BufferedReader(
-        new InputStreamReader(is, StandardCharsets.UTF_8));) {
+    try (BufferedReader reader = openTupleCsv(inputCsvPath)) {
       String line;
       while ((line = reader.readLine()) != null) {
         line = line.trim();
@@ -145,6 +145,19 @@ public class EnhancedStreamAnonymizationProblem implements
       throw new IllegalArgumentException("Cannot read input CSV: " + inputCsvPath, e);
     }
     return tuples;
+  }
+
+  private BufferedReader openTupleCsv(String inputCsvPath) throws IOException {
+    Path path = Path.of(inputCsvPath);
+    if (Files.exists(path)) {
+      return Files.newBufferedReader(path, StandardCharsets.UTF_8);
+    }
+
+    InputStream is = getClass().getClassLoader().getResourceAsStream(inputCsvPath);
+    if (is == null) {
+      throw new IOException("Input CSV not found as file or classpath resource: " + inputCsvPath);
+    }
+    return new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));
   }
 
   /*
