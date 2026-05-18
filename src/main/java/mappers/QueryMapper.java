@@ -183,8 +183,25 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
         valueStringBuilder.append(c.child(0).content());
       }
     }); // value attribute
-    return new FilterOperator(id, specificOpNode.child(0).child(0).content(),
-        specificOpNode.child(1).child(0).content(), Double.parseDouble(valueStringBuilder.toString()));
+
+    String field = specificOpNode.child(0).child(0).content();
+    String condition = specificOpNode.child(1).child(0).content();
+    if (valueStringBuilder.toString().equals("magic")) {
+      if (field.equals("f1") && condition.equals("gt")) {
+        return new FilterOperator(id, field, condition, 4949);
+      } else if (field.equals("f1") && condition.equals("lt")) {
+        return new FilterOperator(id, field, condition, 5051);
+      } else if (field.equals("f2") && condition.equals("gt")) {
+        return new FilterOperator(id, field, condition, 24989);
+      } else if (field.equals("f2") && condition.equals("lt")) {
+        return new FilterOperator(id, field, condition, 25011);
+      } else {
+        throw new IllegalArgumentException(
+            "The 'magic' value is only supported for filters with 'gt' condition on 'f1' or 'f2' fields");
+      }
+    }
+
+    return new FilterOperator(id, field, condition, Double.parseDouble(valueStringBuilder.toString()));
   }
 
   private OperatorRepresentation parseMapDuplicateNode(Tree<String> specificOpNode, String id) {
