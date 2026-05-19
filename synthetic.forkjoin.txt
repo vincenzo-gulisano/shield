@@ -1,21 +1,32 @@
 $basePath = ''outputs/{^^.name}/{^^.startTime}/''
+$minTreeH = 4
+$maxTreeH = 16
+$imgType = png
 
 ea.experiment(
   runs = (randomGenerator = (seed = [1:1:1])
     * [m.defaultRG()])
-    * (solver = (stop = ea.sc.nOfQualityEvaluations(n = 1000))
+    * (solver = (stop = ea.sc.nOfQualityEvaluations(n = 100))
     * [
       ea.s.mapElites(
-        representation = ea.r.cfgTree(grammar = ea.grammar.fromFile(
+        nPop = 100; % note: maybe pick according to possible number of cells of the archive, because map elites keeps only 1 and only 1 per cell
+        representation = ea.r.cfgTree(
+          minTreeH = $minTreeH;
+          maxTreeH = $maxTreeH;
+          grammar = ea.grammar.fromFile(
             path = "src/main/resources/grammars/forkjoin.synthetic/forkjoin.synthetic.all.bnf"));
         mapper = anonym.mapper.queryMapper();
         descriptors = [
-          ea.s.me.d.descriptor(f = f.size(of = ea.f.genotype()); min = 1; max = 64; nOfBins = 8);
+          ea.s.me.d.descriptor(f = ea.f.size(of = ea.f.genotype()); min = 1; max = 64; nOfBins = 8);
           ea.s.me.d.descriptor(f = anonym.f.graphBu(of = ea.f.solution()); min = 1; max = 64; nOfBins = 8)
         ]
       );
       ea.s.nsga2(
-        representation = ea.r.cfgTree(grammar = ea.grammar.fromFile(
+        nPop = 100;
+        representation = ea.r.cfgTree(
+          minTreeH = $minTreeH;
+          maxTreeH = $maxTreeH;
+          grammar = ea.grammar.fromFile(
             path = "src/main/resources/grammars/forkjoin.synthetic/forkjoin.synthetic.all.bnf"));
         mapper = anonym.mapper.queryMapper()
       )
@@ -162,6 +173,18 @@ ea.experiment(
           plot = ea.plot.multi.xyExp(y = f.percentile(p = 75; of = f.each(of = ea.f.all(); mapF = f.mapValue(key = "fidelity"; of = ea.f.quality()))));
           configuration = viz.plot.conf.image(axesShow = all; axesIndependences = [all]);
           type = svg
+    );
+    ea.l.savePlotForRun(
+      path = $basePath + "{solver.name}/{problem.name}/{randomGenerator.seed}-archive." + $imgType;
+      plot = ea.plot.single.me(
+        values = [
+          f.mapValue(key = privacy; of = ea.f.quality());
+          f.mapValue(key = fidelity; of = ea.f.quality());
+          f.mapValue(key = semantics; of = ea.f.quality())
+        ]
+      );
+      kCondition = predicate.matches(f = f.mappableKey(key = "solver.name"); regex = "me"); % this one is to ensure we create these graphs only when the sover is map elites
+      type = $imgType
     )
   ]
 )
