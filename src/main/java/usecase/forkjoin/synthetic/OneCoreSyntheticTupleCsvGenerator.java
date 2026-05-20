@@ -16,13 +16,18 @@ public class OneCoreSyntheticTupleCsvGenerator {
     private static final double FIELD_2_MIN = 20000.0;
     private static final double FIELD_2_MAX = 30000.0;
 
+    private static final double OUTER_FIELD_1_MIN = -150000.0;
+    private static final double OUTER_FIELD_1_MAX = 240000.0;
+    private static final double OUTER_FIELD_2_MIN = -130000.0;
+    private static final double OUTER_FIELD_2_MAX = 180000.0;
+
     private static final double CORE_FIELD_1_BAND_MIN = 4950.0;
     private static final double CORE_FIELD_1_BAND_MAX = 5050.0;
     private static final double CORE_FIELD_2_BAND_MIN = 24950.0;
     private static final double CORE_FIELD_2_BAND_MAX = 25050.0;
 
     private static final double CORE_RECTANGLE_PROBABILITY = 0.005;
-    private static final double ONE_DIMENSION_BAND_PROBABILITY = 0.80;
+    private static final double ONE_DIMENSION_BAND_PROBABILITY = 0.95;
 
     private static final long INITIAL_TIMESTAMP = 0L;
     private static final long MIN_TIMESTAMP_ADVANCE = 1000L;
@@ -41,6 +46,8 @@ public class OneCoreSyntheticTupleCsvGenerator {
         }
         validateRange(FIELD_1_MIN, FIELD_1_MAX, CORE_FIELD_1_BAND_MIN, CORE_FIELD_1_BAND_MAX, "core field 1");
         validateRange(FIELD_2_MIN, FIELD_2_MAX, CORE_FIELD_2_BAND_MIN, CORE_FIELD_2_BAND_MAX, "core field 2");
+        validateContainingRange(OUTER_FIELD_1_MIN, OUTER_FIELD_1_MAX, FIELD_1_MIN, FIELD_1_MAX, "field 1");
+        validateContainingRange(OUTER_FIELD_2_MIN, OUTER_FIELD_2_MAX, FIELD_2_MIN, FIELD_2_MAX, "field 2");
         if (MIN_TIMESTAMP_ADVANCE > MAX_TIMESTAMP_ADVANCE) {
             throw new IllegalArgumentException("MIN_TIMESTAMP_ADVANCE cannot be greater than MAX_TIMESTAMP_ADVANCE");
         }
@@ -85,40 +92,40 @@ public class OneCoreSyntheticTupleCsvGenerator {
         }
 
         return new double[] {
-                randomOutsideBand(
+                randomOutsideRangeWithin(
+                        OUTER_FIELD_1_MIN,
+                        OUTER_FIELD_1_MAX,
                         FIELD_1_MIN,
                         FIELD_1_MAX,
-                        CORE_FIELD_1_BAND_MIN,
-                        CORE_FIELD_1_BAND_MAX,
                         random),
-                randomOutsideBand(
+                randomOutsideRangeWithin(
+                        OUTER_FIELD_2_MIN,
+                        OUTER_FIELD_2_MAX,
                         FIELD_2_MIN,
                         FIELD_2_MAX,
-                        CORE_FIELD_2_BAND_MIN,
-                        CORE_FIELD_2_BAND_MAX,
                         random)
         };
     }
 
-    private static double randomOutsideBand(
-            double min,
-            double max,
-            double bandMin,
-            double bandMax,
+    private static double randomOutsideRangeWithin(
+            double outerMin,
+            double outerMax,
+            double innerMin,
+            double innerMax,
             ThreadLocalRandom random
     ) {
-        double lowerWidth = bandMin - min;
-        double upperWidth = max - bandMax;
+        double lowerWidth = innerMin - outerMin;
+        double upperWidth = outerMax - innerMax;
         double totalWidth = lowerWidth + upperWidth;
         if (totalWidth <= 0.0) {
-            throw new IllegalArgumentException("Cannot generate an out-of-band value when the band covers the range");
+            throw new IllegalArgumentException("Cannot generate an out-of-range value when the inner range covers the outer range");
         }
 
         double r = random.nextDouble(totalWidth);
         if (r < lowerWidth) {
-            return random.nextDouble(min, bandMin);
+            return random.nextDouble(outerMin, innerMin);
         }
-        return random.nextDouble(bandMax, max);
+        return random.nextDouble(innerMax, outerMax);
     }
 
     private static void validateProbability(double probability, String name) {
@@ -133,6 +140,15 @@ public class OneCoreSyntheticTupleCsvGenerator {
         }
         if (bandMin >= bandMax || bandMin < min || bandMax > max) {
             throw new IllegalArgumentException("Band must be ordered and contained in range for " + name);
+        }
+    }
+
+    private static void validateContainingRange(double outerMin, double outerMax, double innerMin, double innerMax, String name) {
+        if (outerMin >= outerMax) {
+            throw new IllegalArgumentException("Outer minimum must be less than outer maximum for " + name);
+        }
+        if (outerMin > innerMin || outerMax < innerMax || (outerMin == innerMin && outerMax == innerMax)) {
+            throw new IllegalArgumentException("Outer range must strictly contain inner range for " + name);
         }
     }
 
