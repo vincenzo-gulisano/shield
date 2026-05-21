@@ -17,8 +17,8 @@ import java.util.stream.Collectors;
 public class OneCoreSyntheticTupleCsvGenerator {
 
     private static final int NUMBER_OF_TUPLES = 1500;
-    private static final int INNER_1_TUPLES = 1420;
-    private static final int INNER_2_TUPLES = 60;
+    public static final int INNER_1_TUPLES = 1420;
+    public static final int INNER_2_TUPLES = 60;
     private static final int NOISE_TUPLES = NUMBER_OF_TUPLES - INNER_1_TUPLES - INNER_2_TUPLES;
 
     private static final double FIELD_1_MIN = 1_000.0;

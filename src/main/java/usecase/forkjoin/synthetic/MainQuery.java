@@ -25,10 +25,23 @@ public class MainQuery {
     public static QueryResult process(List<Tuple> inputStream, String queryId, long minTs, long maxTs) {
 
         final long resolution = 60000L; // 1 minute
-        final double filter1min = 4000.0;
-        final double filter1max = 6000.0;
-        final double filter2min = 24000.0;
-        final double filter2max = 26000.0;
+        final int expectedBranchTuples = Math.min(
+                OneCoreSyntheticTupleCsvGenerator.INNER_1_TUPLES,
+                OneCoreSyntheticTupleCsvGenerator.INNER_2_TUPLES);
+        final FilterBounds branch1Bounds = centeredBoundsForExpectedCount(
+                OneCoreSyntheticTupleCsvGenerator.INNER_1_FIELD_1_MIN,
+                OneCoreSyntheticTupleCsvGenerator.INNER_1_FIELD_1_MAX,
+                OneCoreSyntheticTupleCsvGenerator.INNER_1_FIELD_2_MIN,
+                OneCoreSyntheticTupleCsvGenerator.INNER_1_FIELD_2_MAX,
+                OneCoreSyntheticTupleCsvGenerator.INNER_1_TUPLES,
+                expectedBranchTuples);
+        final FilterBounds branch2Bounds = centeredBoundsForExpectedCount(
+                OneCoreSyntheticTupleCsvGenerator.INNER_2_FIELD_1_MIN,
+                OneCoreSyntheticTupleCsvGenerator.INNER_2_FIELD_1_MAX,
+                OneCoreSyntheticTupleCsvGenerator.INNER_2_FIELD_2_MIN,
+                OneCoreSyntheticTupleCsvGenerator.INNER_2_FIELD_2_MAX,
+                OneCoreSyntheticTupleCsvGenerator.INNER_2_TUPLES,
+                expectedBranchTuples);
 
         // Define the stages to monitor for performance
         StreamStatsWindow statsWindow = new StreamStatsWindow(
@@ -47,22 +60,12 @@ public class MainQuery {
         // Filter for branch 1
         Operator<Tuple, Tuple> b1f = query.addFilterOperator(
                 "b1f-" + queryId,
-                tuple -> {
-                    return (tuple.getField("f1") > OneCoreSyntheticTupleCsvGenerator.INNER_1_FIELD_1_MIN
-                            && tuple.getField("f1") < OneCoreSyntheticTupleCsvGenerator.INNER_1_FIELD_1_MAX
-                            && tuple.getField("f2") > OneCoreSyntheticTupleCsvGenerator.INNER_1_FIELD_2_MIN
-                            && tuple.getField("f2") < OneCoreSyntheticTupleCsvGenerator.INNER_1_FIELD_2_MAX);
-                });
+                branch1Bounds::contains);
 
         // Filter for branch 2
         Operator<Tuple, Tuple> b2f = query.addFilterOperator(
                 "b2f-" + queryId,
-                tuple -> {
-                    return (tuple.getField("f1") > OneCoreSyntheticTupleCsvGenerator.INNER_2_FIELD_1_MIN
-                            && tuple.getField("f1") < OneCoreSyntheticTupleCsvGenerator.INNER_2_FIELD_1_MAX
-                            && tuple.getField("f2") > OneCoreSyntheticTupleCsvGenerator.INNER_2_FIELD_2_MIN
-                            && tuple.getField("f2") < OneCoreSyntheticTupleCsvGenerator.INNER_2_FIELD_2_MAX);
-                });
+                branch2Bounds::contains);
 
         // Inner class for performance metric recording
         class InnerPerformanceRecorder implements MapFunction<Tuple, Tuple> {
@@ -128,6 +131,49 @@ public class MainQuery {
         query.deActivate();
 
         return new QueryResult(collectedEvents, statsWindow);
+    }
+
+    private static FilterBounds centeredBoundsForExpectedCount(double f1Min,
+                                                               double f1Max,
+                                                               double f2Min,
+                                                               double f2Max,
+                                                               int clusterTupleCount,
+                                                               int expectedTupleCount) {
+        if (clusterTupleCount <= 0) {
+            throw new IllegalArgumentException("clusterTupleCount must be positive");
+        }
+        if (expectedTupleCount < 0) {
+            throw new IllegalArgumentException("expectedTupleCount cannot be negative");
+        }
+
+        double selectedAreaFraction = Math.min(1.0, (double) expectedTupleCount / clusterTupleCount);
+        double sideScale = Math.sqrt(selectedAreaFraction);
+        return centeredBounds(f1Min, f1Max, f2Min, f2Max, sideScale);
+    }
+
+    private static FilterBounds centeredBounds(double f1Min,
+                                               double f1Max,
+                                               double f2Min,
+                                               double f2Max,
+                                               double sideScale) {
+        double f1Center = (f1Min + f1Max) / 2.0;
+        double f2Center = (f2Min + f2Max) / 2.0;
+        double f1HalfWidth = (f1Max - f1Min) * sideScale / 2.0;
+        double f2HalfWidth = (f2Max - f2Min) * sideScale / 2.0;
+        return new FilterBounds(
+                f1Center - f1HalfWidth,
+                f1Center + f1HalfWidth,
+                f2Center - f2HalfWidth,
+                f2Center + f2HalfWidth);
+    }
+
+    private record FilterBounds(double f1Min, double f1Max, double f2Min, double f2Max) {
+        private boolean contains(Tuple tuple) {
+            return tuple.getField("f1") > f1Min
+                    && tuple.getField("f1") < f1Max
+                    && tuple.getField("f2") > f2Min
+                    && tuple.getField("f2") < f2Max;
+        }
     }
 
     // Helper method to create a Source Function that reads from a list
