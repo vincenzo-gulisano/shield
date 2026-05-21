@@ -48,14 +48,20 @@ public class MainQuery {
         Operator<Tuple, Tuple> b1f = query.addFilterOperator(
                 "b1f-" + queryId,
                 tuple -> {
-                    return (tuple.getField("f1") >= filter1min && tuple.getField("f1") <= filter1max);
+                    return (tuple.getField("f1") > OneCoreSyntheticTupleCsvGenerator.INNER_1_FIELD_1_MIN
+                            && tuple.getField("f1") < OneCoreSyntheticTupleCsvGenerator.INNER_1_FIELD_1_MAX
+                            && tuple.getField("f2") > OneCoreSyntheticTupleCsvGenerator.INNER_1_FIELD_2_MIN
+                            && tuple.getField("f2") < OneCoreSyntheticTupleCsvGenerator.INNER_1_FIELD_2_MAX);
                 });
 
         // Filter for branch 2
         Operator<Tuple, Tuple> b2f = query.addFilterOperator(
                 "b2f-" + queryId,
                 tuple -> {
-                    return (tuple.getField("f2") >= filter2min && tuple.getField("f2") <= filter2max);
+                    return (tuple.getField("f1") > OneCoreSyntheticTupleCsvGenerator.INNER_2_FIELD_1_MIN
+                            && tuple.getField("f1") < OneCoreSyntheticTupleCsvGenerator.INNER_2_FIELD_1_MAX
+                            && tuple.getField("f2") > OneCoreSyntheticTupleCsvGenerator.INNER_2_FIELD_2_MIN
+                            && tuple.getField("f2") < OneCoreSyntheticTupleCsvGenerator.INNER_2_FIELD_2_MAX);
                 });
 
         // Inner class for performance metric recording
@@ -92,7 +98,7 @@ public class MainQuery {
         Operator<Tuple, Tuple> recorderAfterBranch2 = query.addMapOperator("rec-b2-" + queryId,
                 new InnerPerformanceRecorder("branch2filter", statsWindow));
 
-        UnionOperator<Tuple> union = query.addUnionOperator("union-"+queryId);
+        UnionOperator<Tuple> union = query.addUnionOperator("union-" + queryId);
 
         // Final Sink that adds every valid event to the results list
         Sink<Tuple> sink = query.addBaseSink("o1-" + queryId, event -> {

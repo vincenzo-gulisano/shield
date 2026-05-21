@@ -16,15 +16,15 @@ public class OneCoreSyntheticTupleCsvGenerator {
     private static final double FIELD_2_MIN = 0.0;
     private static final double FIELD_2_MAX = 100_000_000.0;
 
-    private static final double INNER_1_FIELD_1_MIN = 1000.0;
-    private static final double INNER_1_FIELD_1_MAX = 1050.0;
-    private static final double INNER_1_FIELD_2_MIN = 1000.0;
-    private static final double INNER_1_FIELD_2_MAX = 41000.0;
+    public static final double INNER_1_FIELD_1_MIN = 1000.0;
+    public static final double INNER_1_FIELD_1_MAX = 1050.0;
+    public static final double INNER_1_FIELD_2_MIN = 1000.0;
+    public static final double INNER_1_FIELD_2_MAX = 41000.0;
 
-    private static final double INNER_2_FIELD_1_MIN = 992500.0;
-    private static final double INNER_2_FIELD_1_MAX = 997500.0;
-    private static final double INNER_2_FIELD_2_MIN = 990000.0;
-    private static final double INNER_2_FIELD_2_MAX = 990200.0;
+    public static final double INNER_2_FIELD_1_MIN = 992500.0;
+    public static final double INNER_2_FIELD_1_MAX = 997500.0;
+    public static final double INNER_2_FIELD_2_MIN = 990000.0;
+    public static final double INNER_2_FIELD_2_MAX = 990200.0;
 
     private static final double INNER_1_PROBABILITY = 0.485;
     private static final double INNER_2_PROBABILITY = 0.485;
