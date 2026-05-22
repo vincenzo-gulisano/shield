@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 
 import org.slf4j.Logger;
@@ -329,6 +330,14 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     MAX
   }
 
+  private static long deterministicSeed(Object... parts) {
+    long seed = 1125899906842597L;
+    for (Object part : parts) {
+      seed = 31L * seed + Objects.hashCode(part);
+    }
+    return seed;
+  }
+
   public sealed interface OperatorRepresentation
       permits FilterOperator, MapDuplicate, MapNoise, MapRIR, MapAggregate, Fork, Union, Source, Sink {
     public String getID();
@@ -360,7 +369,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     }
 
     public FlatMapFunction<Tuple, Tuple> createMapFunction() {
-      return new MapDuplicateFunction(probability);
+      return new MapDuplicateFunction(probability, deterministicSeed("MapDuplicate", id, probability));
     }
   }
 
@@ -371,7 +380,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     }
 
     public MapNoiseFunction createMapFunction() {
-      return new MapNoiseFunction(field, probability);
+      return new MapNoiseFunction(field, probability, deterministicSeed("MapNoise", id, field, probability));
     }
   }
 
@@ -382,7 +391,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     }
 
     public RIRMap createRIRMap() {
-      return new RIRMap(field);
+      return new RIRMap(field, deterministicSeed("MapRIR", id, field));
     }
   }
 

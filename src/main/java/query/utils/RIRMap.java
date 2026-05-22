@@ -21,14 +21,20 @@ import java.util.Random;
  */
 public class RIRMap implements MapFunction<Tuple, Tuple> {
 
+    private static final long DEFAULT_RANDOM_SEED = 0x5EED_DA7A_1212L;
+
     private final String field;
     private double min = Double.MAX_VALUE;
     private double max = Double.MIN_VALUE;
     private final Random random;
 
     public RIRMap(String field) {
+        this(field, DEFAULT_RANDOM_SEED);
+    }
+
+    public RIRMap(String field, long seed) {
         this.field = field;
-        this.random = new Random();
+        this.random = new Random(seed);
     }
 
     // Applies the moving average transformation to a single event
@@ -58,7 +64,7 @@ public class RIRMap implements MapFunction<Tuple, Tuple> {
         // corresponding attribute
         Tuple out = new Tuple(in);
         if (max > min) {
-            out.set(field, this.random.nextDouble(min, max));
+            out.set(field, min + random.nextDouble() * (max - min));
         }
         return out;
     }

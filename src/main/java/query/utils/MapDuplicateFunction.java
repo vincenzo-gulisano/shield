@@ -24,11 +24,17 @@ import java.util.Random;
  */
 public class MapDuplicateFunction implements FlatMapFunction<Tuple, Tuple> {
 
+    private static final long DEFAULT_RANDOM_SEED = 0x5EED_DA7A_D001_1E5L;
+
     private final Random random;
     private final double prob;
 
     public MapDuplicateFunction(double prob) {
-        this.random = new Random();
+        this(prob, DEFAULT_RANDOM_SEED);
+    }
+
+    public MapDuplicateFunction(double prob, long seed) {
+        this.random = new Random(seed);
         this.prob = prob;
     }
 

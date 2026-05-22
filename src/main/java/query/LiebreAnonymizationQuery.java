@@ -30,11 +30,11 @@ import static query.utils.OperatorUtils.*;
 public class LiebreAnonymizationQuery {
 
     private static final Logger logger = LoggerFactory.getLogger(LiebreAnonymizationQuery.class);
-
+    private static final long DEFAULT_RANDOM_SEED = 0x5EED_DA7A_171EB2EL;
     private final Random random;
 
     public LiebreAnonymizationQuery() {
-        this.random = new Random();
+        this.random = new Random(DEFAULT_RANDOM_SEED);
     }
 
     public List<GenericEvent> processAnonymizationQuery(QueryRepresentation representation, String inputFile, String keyColumn) throws IOException {

@@ -24,12 +24,18 @@ import java.util.Random;
  */
 public class MapNoiseFunction implements MapFunction<Tuple, Tuple> {
 
+    private static final long DEFAULT_RANDOM_SEED = 0x5EED_DA7A_5015E1L;
+
     private final Random random;
     private final String field;
     private final double percentage;
 
     public MapNoiseFunction(String field, double percentage) {
-        this.random = new Random();
+        this(field, percentage, DEFAULT_RANDOM_SEED);
+    }
+
+    public MapNoiseFunction(String field, double percentage, long seed) {
+        this.random = new Random(seed);
         this.field = field;
         this.percentage = percentage;
     }
