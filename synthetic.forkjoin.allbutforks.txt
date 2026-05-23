@@ -7,7 +7,7 @@ ea.experiment(
     * [
       ea.s.nsga2(
         representation = ea.r.cfgTree(grammar = ea.grammar.fromFile(
-            path = "src/main/resources/grammars/forkjoin.synthetic/forkjoin.synthetic.all.bnf"));
+            path = "src/main/resources/grammars/forkjoin.synthetic/forkjoin.synthetic.allbutforks.bnf"));
         mapper = anonym.mapper.queryMapper()
       )
     ])
