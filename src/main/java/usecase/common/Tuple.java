@@ -20,12 +20,12 @@ public class Tuple extends BaseRichTuple implements DoubleFieldLookup {
 
     public Tuple(long timestamp, String key, double... fs) {
         super(timestamp, key);
-        this.fs = fs;
+        this.fs = fs.clone();
     }
 
     public Tuple(long timestamp, double... fs) {
         super(timestamp, "");
-        this.fs = fs;
+        this.fs = fs.clone();
     }
 
     public Tuple(Tuple other) {
