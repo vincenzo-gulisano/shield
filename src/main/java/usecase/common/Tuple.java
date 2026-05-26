@@ -33,11 +33,7 @@ public class Tuple extends BaseRichTuple implements DoubleFieldLookup {
     }
 
     public double getField(String fieldName) {
-        return switch (fieldName) {
-            case "f1" -> fs[0];
-            case "f2" -> fs[1];
-            default -> throw new IllegalArgumentException("Unknown field name: " + fieldName);
-        };
+        return fs[indexForFieldName(fieldName)];
     }
 
     @Override
@@ -51,12 +47,31 @@ public class Tuple extends BaseRichTuple implements DoubleFieldLookup {
 
     @Override
     public void set(String fieldName, double value) {
-        switch (fieldName) {
-            case "f1" -> fs[0] = value;
-            case "f2" -> fs[1] = value;
-            default -> throw new IllegalArgumentException("Unknown field name: " + fieldName);
+        fs[indexForFieldName(fieldName)] = value;
+    }
+
+    private int indexForFieldName(String fieldName) {
+        if (fieldName == null || fieldName.length() < 2 || fieldName.charAt(0) != 'f') {
+            throw new IllegalArgumentException("Field name must have format f<number>: " + fieldName);
         }
-        ;
+        String indexString = fieldName.substring(1);
+        // for (int i = 0; i < indexString.length(); i++) {
+        //     if (!Character.isDigit(indexString.charAt(i))) {
+        //         throw new IllegalArgumentException("Field name must have format f<number>: " + fieldName);
+        //     }
+        // }
+        int oneBasedIndex;
+        try {
+            oneBasedIndex = Integer.parseInt(indexString);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Field index is out of range: " + fieldName, e);
+        }
+        int index = oneBasedIndex - 1;
+        if (index < 0 || index >= fs.length) {
+            throw new IllegalArgumentException(
+                    "Field index " + oneBasedIndex + " is invalid for tuple with " + fs.length + " fields");
+        }
+        return index;
     }
 
 }
