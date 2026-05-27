@@ -8,9 +8,8 @@ import java.util.Map;
 /**
  * Utility for comparing two main-query outputs represented as keyed tuples.
  *
- * <p>The key is the pair {@code (timestamp, cohort)}. This fits both planned NHANES outputs:
- * aggregate-stat tuples, where each key is expected to identify one tuple, and outlier tuples,
- * where several tuples can share the same key because a cohort/window can contain many outliers.
+ * <p>The key is the pair {@code (timestamp, tuple key)}. Some outputs may have at most one tuple
+ * per key, while others may have several tuples with the same timestamp and key.
  *
  * <p>The class never mutates the input maps or their lists. Matching is computed as a one-to-one
  * maximum bipartite matching inside each key group, so one modified tuple can match at most one
@@ -25,7 +24,7 @@ public final class TupleMatchingScore {
         RELATIVE
     }
 
-    public record Key(long timestamp, String cohort) {
+    public record Key(long timestamp, String key) {
     }
 
     private TupleMatchingScore() {
@@ -62,17 +61,16 @@ public final class TupleMatchingScore {
     public static double recall(
             Map<Key, List<Tuple>> original,
             Map<Key, List<Tuple>> modified,
-            List<String> fields,
             double threshold,
             DistanceMode distanceMode) {
-        validateInputs(original, modified, fields, threshold, distanceMode);
+        validateInputs(original, modified, threshold, distanceMode);
 
         int originalCount = countTuples(original);
         if (originalCount == 0) {
             return 1.0;
         }
 
-        int truePositives = countMatches(original, modified, fields, threshold, distanceMode);
+        int truePositives = countMatches(original, modified, threshold, distanceMode);
         return (double) truePositives / originalCount;
     }
 
@@ -85,10 +83,9 @@ public final class TupleMatchingScore {
     public static double f1(
             Map<Key, List<Tuple>> original,
             Map<Key, List<Tuple>> modified,
-            List<String> fields,
             double threshold,
             DistanceMode distanceMode) {
-        validateInputs(original, modified, fields, threshold, distanceMode);
+        validateInputs(original, modified, threshold, distanceMode);
 
         int originalCount = countTuples(original);
         int modifiedCount = countTuples(modified);
@@ -96,7 +93,7 @@ public final class TupleMatchingScore {
             return originalCount == modifiedCount ? 1.0 : 0.0;
         }
 
-        int truePositives = countMatches(original, modified, fields, threshold, distanceMode);
+        int truePositives = countMatches(original, modified, threshold, distanceMode);
         int falseNegatives = originalCount - truePositives;
         int falsePositives = modifiedCount - truePositives;
 
@@ -111,13 +108,12 @@ public final class TupleMatchingScore {
     private static int countMatches(
             Map<Key, List<Tuple>> original,
             Map<Key, List<Tuple>> modified,
-            List<String> fields,
             double threshold,
             DistanceMode distanceMode) {
         int matches = 0;
         for (Map.Entry<Key, List<Tuple>> entry : original.entrySet()) {
             List<Tuple> modifiedTuples = modified.getOrDefault(entry.getKey(), List.of());
-            matches += countMaxMatches(entry.getValue(), modifiedTuples, fields, threshold, distanceMode);
+            matches += countMaxMatches(entry.getValue(), modifiedTuples, threshold, distanceMode);
         }
         return matches;
     }
@@ -125,7 +121,6 @@ public final class TupleMatchingScore {
     private static int countMaxMatches(
             List<Tuple> original,
             List<Tuple> modified,
-            List<String> fields,
             double threshold,
             DistanceMode distanceMode) {
         int[] matchedOriginalByModified = new int[modified.size()];
@@ -134,7 +129,7 @@ public final class TupleMatchingScore {
         int matches = 0;
         for (int i = 0; i < original.size(); i++) {
             boolean[] seenModified = new boolean[modified.size()];
-            if (tryMatch(i, original, modified, fields, threshold, distanceMode,
+            if (tryMatch(i, original, modified, threshold, distanceMode,
                     matchedOriginalByModified, seenModified)) {
                 matches++;
             }
@@ -146,7 +141,6 @@ public final class TupleMatchingScore {
             int originalIndex,
             List<Tuple> original,
             List<Tuple> modified,
-            List<String> fields,
             double threshold,
             DistanceMode distanceMode,
             int[] matchedOriginalByModified,
@@ -154,12 +148,12 @@ public final class TupleMatchingScore {
         for (int modifiedIndex = 0; modifiedIndex < modified.size(); modifiedIndex++) {
             if (seenModified[modifiedIndex]
                     || !tuplesMatch(original.get(originalIndex), modified.get(modifiedIndex),
-                    fields, threshold, distanceMode)) {
+                    threshold, distanceMode)) {
                 continue;
             }
             seenModified[modifiedIndex] = true;
             if (matchedOriginalByModified[modifiedIndex] == -1
-                    || tryMatch(matchedOriginalByModified[modifiedIndex], original, modified, fields,
+                    || tryMatch(matchedOriginalByModified[modifiedIndex], original, modified,
                     threshold, distanceMode, matchedOriginalByModified, seenModified)) {
                 matchedOriginalByModified[modifiedIndex] = originalIndex;
                 return true;
@@ -171,10 +165,15 @@ public final class TupleMatchingScore {
     private static boolean tuplesMatch(
             Tuple original,
             Tuple modified,
-            List<String> fields,
             double threshold,
             DistanceMode distanceMode) {
-        for (String field : fields) {
+        if (original.getNumFields() != modified.getNumFields()) {
+            throw new IllegalArgumentException(
+                    "Cannot compare tuples with different field counts: "
+                            + original.getNumFields() + " and " + modified.getNumFields());
+        }
+        for (int i = 1; i <= original.getNumFields(); i++) {
+            String field = "f" + i;
             if (!valuesMatch(original.lookup(field), modified.lookup(field), threshold, distanceMode)) {
                 return false;
             }
@@ -208,14 +207,10 @@ public final class TupleMatchingScore {
     private static void validateInputs(
             Map<Key, List<Tuple>> original,
             Map<Key, List<Tuple>> modified,
-            List<String> fields,
             double threshold,
             DistanceMode distanceMode) {
         if (original == null || modified == null) {
             throw new IllegalArgumentException("Input maps cannot be null");
-        }
-        if (fields == null || fields.isEmpty()) {
-            throw new IllegalArgumentException("Fields cannot be null or empty");
         }
         if (threshold < 0.0 || Double.isNaN(threshold)) {
             throw new IllegalArgumentException("Threshold must be a non-negative number");
