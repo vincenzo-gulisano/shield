@@ -19,19 +19,38 @@ public final class TupleMatchingScore {
 
     private static final double EPSILON = 1e-9;
 
+    /**
+     * Defines how numeric tuple fields are compared against the provided threshold.
+     *
+     * <p>Use {@link #ABSOLUTE} when the fields already share a meaningful absolute scale. Use
+     * {@link #RELATIVE} when a percentage-like tolerance is more appropriate.
+     */
     public enum DistanceMode {
         ABSOLUTE,
         RELATIVE
     }
 
+    /**
+     * Grouping key used by the scorer.
+     *
+     * <p>It is built from the tuple timestamp and tuple key, so callers do not need a separate
+     * domain-specific identifier such as a cohort field.
+     */
     public record Key(long timestamp, String key) {
     }
 
+    /**
+     * Static utility class; instances are not needed.
+     */
     private TupleMatchingScore() {
     }
 
     /**
      * Build grouped output from a flat tuple list using each tuple's timestamp and key.
+     *
+     * <p>Use this when a main query naturally returns a {@code List<Tuple>} and the scorer needs
+     * the grouped representation {@code Map<Key, List<Tuple>>}. Multiple tuples with the same
+     * timestamp/key are preserved in the list for that key.
      */
     public static Map<Key, List<Tuple>> groupByTimestampAndKey(List<? extends Tuple> tuples) {
         Map<Key, List<Tuple>> grouped = new LinkedHashMap<>();
@@ -43,20 +62,11 @@ public final class TupleMatchingScore {
     }
 
     /**
-     * Convert an output with one tuple per key into the grouped form used by the scorer.
-     */
-    public static Map<Key, List<Tuple>> groupSingletons(Map<Key, ? extends Tuple> tuplesByKey) {
-        Map<Key, List<Tuple>> grouped = new LinkedHashMap<>();
-        for (Map.Entry<Key, ? extends Tuple> entry : tuplesByKey.entrySet()) {
-            grouped.put(entry.getKey(), List.of(entry.getValue()));
-        }
-        return grouped;
-    }
-
-    /**
      * Recall-style score: matched original tuples divided by original tuples.
      *
-     * <p>This is useful when extra tuples in the modified output should not be penalized.
+     * <p>Use this when missing expected tuples should reduce the score, but extra tuples in the
+     * modified output should not be penalized. This is suitable for outputs where false positives
+     * are not important for the objective.
      */
     public static double recall(
             Map<Key, List<Tuple>> original,
@@ -78,7 +88,8 @@ public final class TupleMatchingScore {
      * F1-style score over matched tuples.
      *
      * <p>This penalizes both missing original tuples and extra unmatched tuples in the modified
-     * output. It is usually the better choice for outlier semantics.
+     * output. Use this when false positives and false negatives should both reduce the score, for
+     * example when comparing outlier outputs.
      */
     public static double f1(
             Map<Key, List<Tuple>> original,
@@ -105,6 +116,13 @@ public final class TupleMatchingScore {
         return 2.0 * precision * recall / (precision + recall);
     }
 
+    /**
+     * Count all one-to-one tuple matches across all keys.
+     *
+     * <p>Used internally by both {@link #recall(Map, Map, double, DistanceMode)} and
+     * {@link #f1(Map, Map, double, DistanceMode)}. Each key group is matched independently, so a
+     * tuple can only match another tuple with the same timestamp/key.
+     */
     private static int countMatches(
             Map<Key, List<Tuple>> original,
             Map<Key, List<Tuple>> modified,
@@ -118,6 +136,13 @@ public final class TupleMatchingScore {
         return matches;
     }
 
+    /**
+     * Count the maximum number of one-to-one matches inside a single key group.
+     *
+     * <p>Use this internally when several tuples share the same key. It finds the best pairing
+     * between original and modified tuples instead of greedily consuming the first acceptable
+     * modified tuple.
+     */
     private static int countMaxMatches(
             List<Tuple> original,
             List<Tuple> modified,
@@ -137,6 +162,13 @@ public final class TupleMatchingScore {
         return matches;
     }
 
+    /**
+     * Recursive augmenting-path step used by the per-key maximum matching.
+     *
+     * <p>This is the standard small bipartite-matching routine behind {@link #countMaxMatches}.
+     * It tries to assign one original tuple to a compatible modified tuple, reassigning previous
+     * matches when that increases the total number of matches.
+     */
     private static boolean tryMatch(
             int originalIndex,
             List<Tuple> original,
@@ -162,6 +194,12 @@ public final class TupleMatchingScore {
         return false;
     }
 
+    /**
+     * Check whether two tuples match under the configured distance rule.
+     *
+     * <p>Used by the matching routine. It compares all tuple fields {@code f1..fN}; if the tuples
+     * do not have the same number of fields, comparison is invalid and an exception is thrown.
+     */
     private static boolean tuplesMatch(
             Tuple original,
             Tuple modified,
@@ -181,6 +219,12 @@ public final class TupleMatchingScore {
         return true;
     }
 
+    /**
+     * Check whether two numeric field values are close enough.
+     *
+     * <p>Used by {@link #tuplesMatch(Tuple, Tuple, double, DistanceMode)} for each field. NaN
+     * values only match other NaN values.
+     */
     private static boolean valuesMatch(
             double original,
             double modified,
@@ -196,6 +240,11 @@ public final class TupleMatchingScore {
         };
     }
 
+    /**
+     * Count the total number of tuples stored in a grouped output map.
+     *
+     * <p>Used to compute recall, precision, and the empty-output edge cases.
+     */
     private static int countTuples(Map<Key, List<Tuple>> tuplesByKey) {
         int count = 0;
         for (List<Tuple> tuples : tuplesByKey.values()) {
@@ -204,6 +253,12 @@ public final class TupleMatchingScore {
         return count;
     }
 
+    /**
+     * Validate common scorer inputs before matching starts.
+     *
+     * <p>Used by the public scoring methods to fail early on null maps, invalid thresholds, or a
+     * missing distance mode.
+     */
     private static void validateInputs(
             Map<Key, List<Tuple>> original,
             Map<Key, List<Tuple>> modified,
