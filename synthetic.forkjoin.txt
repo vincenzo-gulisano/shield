@@ -1,12 +1,13 @@
 $basePath = ''outputs/{^^.name}/{^^.startTime}/''
 $minTreeH = 4
 $maxTreeH = 16
-$imgType = png
+$imgType = svg
+$nPop = 100
 
 ea.experiment(
-  runs = (randomGenerator = (seed = [1:1:1])
+  runs = (randomGenerator = (seed = [1:1:5])
     * [m.defaultRG()])
-    * (solver = (stop = ea.sc.nOfQualityEvaluations(n = 100))
+    * (solver = (stop = ea.sc.nOfQualityEvaluations(n = 10000))
     * [
       ea.s.mapElites(
         nPop = 100; % note: maybe pick according to possible number of cells of the archive, because map elites keeps only 1 and only 1 per cell
@@ -17,19 +18,19 @@ ea.experiment(
             path = "src/main/resources/grammars/forkjoin.synthetic/forkjoin.synthetic.all.bnf"));
         mapper = anonym.mapper.queryMapper();
         descriptors = [
-          ea.s.me.d.descriptor(f = ea.f.size(of = ea.f.genotype()); min = 1; max = 64; nOfBins = 8);
-          ea.s.me.d.descriptor(f = anonym.f.graphBu(of = ea.f.solution()); min = 1; max = 64; nOfBins = 8)
+          ea.s.me.d.descriptor(f = anonym.f.graphFiltersCount(of = ea.f.solution()); min = 0; max = 4; nOfBins = 5);
+          ea.s.me.d.descriptor(f = anonym.f.graphForksCount(of = ea.f.solution()); min = 0; max = 4; nOfBins = 5)
         ]
-      );
-      ea.s.nsga2(
-        nPop = 100;
-        representation = ea.r.cfgTree(
-          minTreeH = $minTreeH;
-          maxTreeH = $maxTreeH;
-          grammar = ea.grammar.fromFile(
-            path = "src/main/resources/grammars/forkjoin.synthetic/forkjoin.synthetic.all.bnf"));
-        mapper = anonym.mapper.queryMapper()
-      )
+      )%;
+      %ea.s.nsga2(
+      %  nPop = 100;
+      %  representation = ea.r.cfgTree(
+      %    minTreeH = $minTreeH;
+      %    maxTreeH = $maxTreeH;
+      %    grammar = ea.grammar.fromFile(
+      %      path = "src/main/resources/grammars/forkjoin.synthetic/forkjoin.synthetic.all.bnf"));
+      %  mapper = anonym.mapper.queryMapper()
+      %)
     ])
     * [
     ea.run(
@@ -79,7 +80,7 @@ ea.experiment(
       ]
     );
     ea.l.savePlotForRun(
-      path = $basePath + "scatter-fidelity-vs-semantics-{randomGenerator.seed:%03d}.svg";
+      path = $basePath + "{solver.name}/{problem.name}/{randomGenerator.seed}/" + "scatter-fidelity-vs-semantics.svg";
       plot = ea.plot.single.biObjectivePopulation(
         x = f.mapValue(key = "fidelity"; of = ea.f.quality());
         y = f.mapValue(key = "semantics"; of = ea.f.quality())
@@ -89,7 +90,7 @@ ea.experiment(
       type = svg
     );
     ea.l.savePlotForRun(
-      path = $basePath + "scatter-privacy-vs-semantics-{randomGenerator.seed:%03d}.svg";
+      path = $basePath + "{solver.name}/{problem.name}/{randomGenerator.seed}/" + "scatter-privacy-vs-semantics.svg";
       plot = ea.plot.single.biObjectivePopulation(
         x = f.mapValue(key = privacy; of = ea.f.quality());
         y = f.mapValue(key = "semantics"; of = ea.f.quality())
@@ -99,7 +100,7 @@ ea.experiment(
       type = svg
     );
     ea.l.savePlotForRun(
-      path = $basePath + "scatter-fidelity-vs-privacy-{randomGenerator.seed:%03d}.svg";
+      path = $basePath + "{solver.name}/{problem.name}/{randomGenerator.seed}/" + "scatter-fidelity-vs-privacy.svg";
       plot = ea.plot.single.biObjectivePopulation(
         x = f.mapValue(key = "fidelity"; of = ea.f.quality());
         y = f.mapValue(key = privacy; of = ea.f.quality())
@@ -175,7 +176,7 @@ ea.experiment(
           type = svg
     );
     ea.l.savePlotForRun(
-      path = $basePath + "{solver.name}/{problem.name}/{randomGenerator.seed}-archive." + $imgType;
+      path = $basePath + "{solver.name}/{problem.name}/{randomGenerator.seed}/archive." + $imgType;
       plot = ea.plot.single.me(
         values = [
           f.mapValue(key = privacy; of = ea.f.quality());
