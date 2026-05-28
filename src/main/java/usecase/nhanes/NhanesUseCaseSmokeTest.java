@@ -18,6 +18,7 @@ public final class NhanesUseCaseSmokeTest {
     public static void main(String[] args) {
         printPrivacyScore();
         testF1Scores();
+        runMainQuery();
     }
 
     private static void printPrivacyScore() {
@@ -76,6 +77,18 @@ public final class NhanesUseCaseSmokeTest {
                         new Tuple(0L, "b", 25.0)),
                 0.1,
                 0.5);
+    }
+
+    private static void runMainQuery() {
+        List<Tuple> tuples = NhanesTupleLoader.load();
+        MainQuery mainQuery = new MainQuery();
+        MainQuery.QueryResult result = mainQuery.process(tuples, "smoke");
+        int aggregateStatsCount = result.outputAggregatedStats().size();
+        int outlierCount = result.outputOutliers().size();
+        System.out.printf("mainQueryInput=%d%n", tuples.size());
+        System.out.printf("mainQueryAggregateStats=%d%n", aggregateStatsCount);
+        System.out.printf("mainQueryOutliers=%d%n", outlierCount);
+        System.out.printf("mainQueryTotalOutput=%d%n", aggregateStatsCount + outlierCount);
     }
 
     private static Map<Key, List<Tuple>> outliers(Tuple... tuples) {
