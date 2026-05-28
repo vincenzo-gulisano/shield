@@ -42,7 +42,7 @@ public class Mappers {
     }
 
     @Cacheable
-    public static QueryMapper queryMapper(
+    public static QueryMapper queryMapperWithSampler(
             @Param("fieldValueSampler") FieldValueSampler fieldValueSampler) {
         return new QueryMapper(fieldValueSampler);
     }

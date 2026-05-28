@@ -9,26 +9,8 @@ ea.experiment(
     * [m.defaultRG()])
     * (solver = (stop = ea.sc.nOfQualityEvaluations(n = 10000))
     * [
-      ea.s.mapElites(
-        nPop = 100; % note: maybe pick according to possible number of cells of the archive, because map elites keeps only 1 and only 1 per cell
-        representation = ea.r.cfgTree(
-          minTreeH = $minTreeH;
-          maxTreeH = $maxTreeH;
-          grammar = ea.grammar.fromFile(
-            path = "src/main/resources/grammars/nhanes/nhanes.all.bnf"));
-        mapper = anonym.mapper.queryMapper(
-          fieldValueSampler = anonym.valueSampler.nhanesTupleFieldValueSampler(
-            inputCsvPath = "datasets/nhanes.csv";
-            seed = 0
-          )
-        );
-        descriptors = [
-          ea.s.me.d.descriptor(f = anonym.f.graphFiltersCount(of = ea.f.solution()); min = 0; max = 4; nOfBins = 5);
-          ea.s.me.d.descriptor(f = anonym.f.graphForksCount(of = ea.f.solution()); min = 0; max = 4; nOfBins = 5)
-        ]
-      )%;
-      %ea.s.nsga2(
-      %  nPop = 100;
+      %ea.s.mapElites(
+      %  nPop = 100; % note: maybe pick according to possible number of cells of the archive, because map elites keeps only 1 and only 1 per cell
       %  representation = ea.r.cfgTree(
       %    minTreeH = $minTreeH;
       %    maxTreeH = $maxTreeH;
@@ -39,8 +21,26 @@ ea.experiment(
       %      inputCsvPath = "datasets/nhanes.csv";
       %      seed = 0
       %    )
-      %  )
-      %)
+      %  );
+      %  descriptors = [
+      %    ea.s.me.d.descriptor(f = anonym.f.graphFiltersCount(of = ea.f.solution()); min = 0; max = 4; nOfBins = 5);
+      %    ea.s.me.d.descriptor(f = anonym.f.graphForksCount(of = ea.f.solution()); min = 0; max = 4; nOfBins = 5)
+      %  ]
+      %)%;
+      ea.s.nsga2(
+        nPop = 100;
+        representation = ea.r.cfgTree(
+          minTreeH = $minTreeH;
+          maxTreeH = $maxTreeH;
+          grammar = ea.grammar.fromFile(
+            path = "src/main/resources/grammars/nhanes/nhanes.all.bnf"));
+        mapper = anonym.mapper.queryMapperWithSampler(
+          fieldValueSampler = anonym.valueSampler.nhanesTupleFieldValueSampler(
+            inputCsvPath = "datasets/nhanes.csv";
+            seed = 0
+          )
+        )
+      )
     ])
     * [
     ea.run(
