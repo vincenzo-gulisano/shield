@@ -40,11 +40,24 @@ import query.utils.MapAggregateFunction;
 import query.utils.MapDuplicateFunction;
 import query.utils.MapNoiseFunction;
 import query.utils.RIRMap;
+import usecase.common.FieldValueSampler;
 import usecase.common.Tuple;
 
 public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<OperatorRepresentation, ArcType>> {
 
   private static final Logger logger = LoggerFactory.getLogger(QueryMapper.class);
+  private static final String URIR = "urir";
+  private static final String DRIR = "drir";
+
+  private final FieldValueSampler fieldValueSampler;
+
+  public QueryMapper() {
+    this.fieldValueSampler = null;
+  }
+
+  public QueryMapper(FieldValueSampler fieldValueSampler) {
+    this.fieldValueSampler = Objects.requireNonNull(fieldValueSampler);
+  }
 
   @Override
   public Tree<String> exampleFor(
@@ -187,22 +200,24 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
 
     String field = specificOpNode.child(0).child(0).content();
     String condition = specificOpNode.child(1).child(0).content();
-    if (valueStringBuilder.toString().equals("magic")) {
-      if (field.equals("f1") && condition.equals("gt")) {
-        return new FilterOperator(id, field, condition, 4949);
-      } else if (field.equals("f1") && condition.equals("lt")) {
-        return new FilterOperator(id, field, condition, 5051);
-      } else if (field.equals("f2") && condition.equals("gt")) {
-        return new FilterOperator(id, field, condition, 24989);
-      } else if (field.equals("f2") && condition.equals("lt")) {
-        return new FilterOperator(id, field, condition, 25011);
-      } else {
-        throw new IllegalArgumentException(
-            "The 'magic' value is only supported for filters with 'gt' condition on 'f1' or 'f2' fields");
-      }
+    String value = valueStringBuilder.toString();
+    if (value.equals(URIR) || value.equals(DRIR)) {
+      return new FilterOperator(id, field, condition, sampleFilterValue(value, field));
     }
 
-    return new FilterOperator(id, field, condition, Double.parseDouble(valueStringBuilder.toString()));
+    return new FilterOperator(id, field, condition, Double.parseDouble(value));
+  }
+
+  private double sampleFilterValue(String value, String field) {
+    if (fieldValueSampler == null) {
+      throw new IllegalStateException(
+          "Filter value '" + value + "' requires a FieldValueSampler configured on QueryMapper");
+    }
+    return switch (value) {
+      case URIR -> fieldValueSampler.urir(field);
+      case DRIR -> fieldValueSampler.drir(field);
+      default -> throw new IllegalArgumentException("Unknown sampled filter value: " + value);
+    };
   }
 
   private OperatorRepresentation parseMapDuplicateNode(Tree<String> specificOpNode, String id) {

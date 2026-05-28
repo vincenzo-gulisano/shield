@@ -1,6 +1,0 @@
-<pipeline> ::= <operator> | <operator> <pipeline>
-<operator> ::= <filter>
-<filter> ::= <attribute> <condition> <value>
-<attribute> ::= f1 | f2
-<condition> ::= lt | gt
-<value> ::= magic

@@ -29,10 +29,14 @@ public final class NhanesTupleLoader {
     }
 
     public static List<Tuple> load() {
+        return load(RESOURCE_PATH);
+    }
+
+    public static List<Tuple> load(String resourcePath) {
         InputStream inputStream = NhanesTupleLoader.class.getClassLoader()
-                .getResourceAsStream(RESOURCE_PATH);
+                .getResourceAsStream(resourcePath);
         if (inputStream == null) {
-            throw new IllegalArgumentException("Resource not found: " + RESOURCE_PATH);
+            throw new IllegalArgumentException("Resource not found: " + resourcePath);
         }
 
         CSVFormat format = CSVFormat.DEFAULT.builder()
@@ -52,7 +56,7 @@ public final class NhanesTupleLoader {
                 tuples.add(new Tuple(TIMESTAMP, KEY, fields));
             }
         } catch (IOException e) {
-            throw new IllegalArgumentException("Cannot read resource: " + RESOURCE_PATH, e);
+            throw new IllegalArgumentException("Cannot read resource: " + resourcePath, e);
         }
         return tuples;
     }

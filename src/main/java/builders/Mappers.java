@@ -18,8 +18,10 @@ package builders;
 
 import io.github.ericmedvet.jnb.core.Cacheable;
 import io.github.ericmedvet.jnb.core.Discoverable;
+import io.github.ericmedvet.jnb.core.Param;
 import mappers.Mapper;
 import mappers.QueryMapper;
+import usecase.common.FieldValueSampler;
 
 @Discoverable(prefixTemplate = "anonym.mapper")
 public class Mappers {
@@ -37,5 +39,11 @@ public class Mappers {
     @Cacheable
     public static QueryMapper queryMapper() {
         return new QueryMapper();
+    }
+
+    @Cacheable
+    public static QueryMapper queryMapper(
+            @Param("fieldValueSampler") FieldValueSampler fieldValueSampler) {
+        return new QueryMapper(fieldValueSampler);
     }
 }

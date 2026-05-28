@@ -6,10 +6,9 @@
 <map_aggregate> ::= <attribute> <agg_fun> <window_size>
 <map_rir> ::= <attribute>
 <fork_ops_join> ::= <pipeline> <pipeline>
-<attribute> ::= f1 | f2
+<attribute> ::= f1 | f2 | f3 | f4 | f5 | f6
 <condition> ::= lt | gt
-<value> ::= <dig> <dig> <dig> <dig> <dig> <dig> . <dig> <dig>
-<dig> ::= 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
+<value> ::= urir | drir
 <agg_fun> ::= min | avg | max
 <window_size> ::= 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10
 <probability> ::= 0.1 | 0.2 | 0.3 | 0.4 | 0.5 | 0.6 | 0.7 | 0.8 | 0.9 | 1.0

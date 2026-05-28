@@ -1,7 +1,0 @@
-<pipeline> ::= <operator> | <operator> <pipeline>
-<operator> ::= <filter> | <fork_ops_join>
-<filter> ::= <attribute> <condition> <value>
-<fork_ops_join> ::= <pipeline> <pipeline>
-<attribute> ::= f1 | f2
-<condition> ::= lt | gt
-<value> ::= magic

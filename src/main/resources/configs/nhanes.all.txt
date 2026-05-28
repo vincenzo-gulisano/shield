@@ -15,8 +15,13 @@ ea.experiment(
           minTreeH = $minTreeH;
           maxTreeH = $maxTreeH;
           grammar = ea.grammar.fromFile(
-            path = "src/main/resources/grammars/forkjoin.synthetic/forkjoin.synthetic.all.bnf"));
-        mapper = anonym.mapper.queryMapper();
+            path = "src/main/resources/grammars/nhanes/nhanes.all.bnf"));
+        mapper = anonym.mapper.queryMapper(
+          fieldValueSampler = anonym.valueSampler.nhanesTupleFieldValueSampler(
+            inputCsvPath = "datasets/nhanes.csv";
+            seed = 0
+          )
+        );
         descriptors = [
           ea.s.me.d.descriptor(f = anonym.f.graphFiltersCount(of = ea.f.solution()); min = 0; max = 4; nOfBins = 5);
           ea.s.me.d.descriptor(f = anonym.f.graphForksCount(of = ea.f.solution()); min = 0; max = 4; nOfBins = 5)
@@ -28,14 +33,19 @@ ea.experiment(
       %    minTreeH = $minTreeH;
       %    maxTreeH = $maxTreeH;
       %    grammar = ea.grammar.fromFile(
-      %      path = "src/main/resources/grammars/forkjoin.synthetic/forkjoin.synthetic.all.bnf"));
-      %  mapper = anonym.mapper.queryMapper()
+      %      path = "src/main/resources/grammars/nhanes/nhanes.all.bnf"));
+      %  mapper = anonym.mapper.queryMapper(
+      %    fieldValueSampler = anonym.valueSampler.nhanesTupleFieldValueSampler(
+      %      inputCsvPath = "datasets/nhanes.csv";
+      %      seed = 0
+      %    )
+      %  )
       %)
     ])
     * [
     ea.run(
-      problem = anonym.problem.enhancedStreamAnonymizationProblem(
-        inputCsvPath = "datasets/synthetic.forkjointest.csv";
+      problem = anonym.problem.nhanesStreamAnonymizationProblem(
+        inputCsvPath = "datasets/nhanes.csv";
         privacyMetric = K_ANONYMITY_CARDINALITY_Q99
       )
     )
