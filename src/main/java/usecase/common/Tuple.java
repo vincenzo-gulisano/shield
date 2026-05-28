@@ -45,6 +45,10 @@ public class Tuple extends BaseRichTuple implements DoubleFieldLookup {
         return fs.length;
     }
 
+    public double[] getFields() {
+        return fs;
+    }
+
     @Override
     public void set(String fieldName, double value) {
         fs[indexForFieldName(fieldName)] = value;
