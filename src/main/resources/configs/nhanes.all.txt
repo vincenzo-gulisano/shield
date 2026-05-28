@@ -7,7 +7,7 @@ $nPop = 100
 ea.experiment(
   runs = (randomGenerator = (seed = [1:1:5])
     * [m.defaultRG()])
-    * (solver = (stop = ea.sc.nOfQualityEvaluations(n = 10000))
+    * (solver = (stop = ea.sc.nOfQualityEvaluations(n = 20000))
     * [
       %ea.s.mapElites(
       %  nPop = 100; % note: maybe pick according to possible number of cells of the archive, because map elites keeps only 1 and only 1 per cell
@@ -15,7 +15,7 @@ ea.experiment(
       %    minTreeH = $minTreeH;
       %    maxTreeH = $maxTreeH;
       %    grammar = ea.grammar.fromFile(
-      %      path = "src/main/resources/grammars/nhanes/nhanes.all.bnf"));
+      %      path = "src/main/resources/grammars/nhanes/nhanes.allbutforks.bnf"));
       %  mapper = anonym.mapper.queryMapper(
       %    fieldValueSampler = anonym.valueSampler.nhanesTupleFieldValueSampler(
       %      inputCsvPath = "datasets/nhanes.csv";
@@ -28,12 +28,12 @@ ea.experiment(
       %  ]
       %)%;
       ea.s.nsga2(
-        nPop = 100;
+        nPop = 200;
         representation = ea.r.cfgTree(
           minTreeH = $minTreeH;
           maxTreeH = $maxTreeH;
           grammar = ea.grammar.fromFile(
-            path = "src/main/resources/grammars/nhanes/nhanes.all.bnf"));
+            path = "src/main/resources/grammars/nhanes/nhanes.allbutforks.bnf"));
         mapper = anonym.mapper.queryMapperWithSampler(
           fieldValueSampler = anonym.valueSampler.nhanesTupleFieldValueSampler(
             inputCsvPath = "datasets/nhanes.csv";
