@@ -14,6 +14,7 @@ import component.source.SourceFunction;
 import metrics.performance.utils.StreamStatsWindow;
 import query.Query;
 import usecase.common.CollectionSourceFactory;
+import usecase.common.ListTuple;
 import usecase.common.Tuple;
 import usecase.forkjoin.synthetic.OneCoreSyntheticTupleCsvGenerator;
 
@@ -60,29 +61,9 @@ public class MainQuery {
 
         RouterOperator<Tuple> router = query.addRouterOperator("router-" + queryId);
 
-        // Filter for branch 1
-        // Operator<Tuple, Tuple> b1f =
-        query.addTimeAggregateOperator("StatsA-"+queryId,1,1, new BaseTimeWindowAdd<Tuple,Tuple>() {
+        Operator<Tuple, ListTuple> agg1 = query.addTimeAggregateOperator("StatsA-"+queryId,1,1, new StatsTimeWindow());
 
-            @Override
-            public TimeWindowAdd<Tuple, Tuple> factory() {
-                // TODO Auto-generated method stub
-                throw new UnsupportedOperationException("Unimplemented method 'factory'");
-            }
-
-            @Override
-            public void add(Tuple arg0) {
-                // TODO Auto-generated method stub
-                throw new UnsupportedOperationException("Unimplemented method 'add'");
-            }
-
-            @Override
-            public Tuple getAggregatedResult() {
-                // TODO Auto-generated method stub
-                throw new UnsupportedOperationException("Unimplemented method 'getAggregatedResult'");
-            }
-            
-        })
+        Operator<ListTuple, Tuple> agg1unpack = query.addFlatMapOperator("StatsAUnpack-"+queryId, lt -> lt.getTuples().stream().toList());
 
         // Final Sink that adds every valid event to the results list
         Sink<Tuple> sink = query.addBaseSink("o1-" + queryId, event -> {
@@ -112,121 +93,6 @@ public class MainQuery {
         query.deActivate();
 
         return new QueryResult(outputAggregatedStats, outputOutliers);
-    }
-
-    private static final class StatsTimeWindow extends BaseTimeWindowAdd<Tuple, Tuple> {
-
-        private static final int STATS_PER_FIELD = 9;
-
-        private final List<List<Double>> sortedValuesByField = new ArrayList<>();
-        private int numFields = -1;
-
-        @Override
-        public TimeWindowAdd<Tuple, Tuple> factory() {
-            return new StatsTimeWindow();
-        }
-
-        @Override
-        public void add(Tuple tuple) {
-            if (tuple == null) {
-                return;
-            }
-            initializeIfNeeded(tuple.getNumFields());
-            if (tuple.getNumFields() != numFields) {
-                throw new IllegalArgumentException(
-                        "Expected " + numFields + " fields, found " + tuple.getNumFields());
-            }
-            for (int i = 0; i < numFields; i++) {
-                double value = tuple.getField("f" + (i + 1));
-                if (!Double.isNaN(value)) {
-                    insertSorted(sortedValuesByField.get(i), value);
-                }
-            }
-        }
-
-        @Override
-        public Tuple getAggregatedResult() {
-            String outputKey = key == null ? "" : key;
-            if (numFields < 0) {
-                return new Tuple(startTimestamp, outputKey);
-            }
-
-            double[] stats = new double[numFields * STATS_PER_FIELD];
-            int outIndex = 0;
-            for (List<Double> values : sortedValuesByField) {
-                stats[outIndex++] = values.size();
-                stats[outIndex++] = mean(values);
-                stats[outIndex++] = std(values);
-                stats[outIndex++] = percentile(values, 0.50);
-                stats[outIndex++] = percentile(values, 0.05);
-                stats[outIndex++] = percentile(values, 0.25);
-                stats[outIndex++] = percentile(values, 0.75);
-                stats[outIndex++] = percentile(values, 0.95);
-                stats[outIndex++] = percentile(values, 0.99);
-            }
-            return new Tuple(startTimestamp, outputKey, stats);
-        }
-
-        private void initializeIfNeeded(int newNumFields) {
-            if (numFields >= 0) {
-                return;
-            }
-            numFields = newNumFields;
-            for (int i = 0; i < numFields; i++) {
-                sortedValuesByField.add(new ArrayList<>());
-            }
-        }
-
-        private static void insertSorted(List<Double> values, double value) {
-            int index = Collections.binarySearch(values, value);
-            if (index < 0) {
-                index = -index - 1;
-            }
-            values.add(index, value);
-        }
-
-        private static double mean(List<Double> values) {
-            if (values.isEmpty()) {
-                return Double.NaN;
-            }
-            double sum = 0.0;
-            for (double value : values) {
-                sum += value;
-            }
-            return sum / values.size();
-        }
-
-        private static double std(List<Double> values) {
-            if (values.size() < 2) {
-                return 0.0;
-            }
-            double mean = mean(values);
-            double sumSquaredDiffs = 0.0;
-            for (double value : values) {
-                double diff = value - mean;
-                sumSquaredDiffs += diff * diff;
-            }
-            return Math.sqrt(sumSquaredDiffs / (values.size() - 1));
-        }
-
-        private static double percentile(List<Double> sortedValues, double p) {
-            if (sortedValues.isEmpty()) {
-                return Double.NaN;
-            }
-            if (sortedValues.size() == 1) {
-                return sortedValues.get(0);
-            }
-            double position = p * (sortedValues.size() - 1);
-            int lowerIndex = (int) Math.floor(position);
-            int upperIndex = (int) Math.ceil(position);
-            if (lowerIndex == upperIndex) {
-                return sortedValues.get(lowerIndex);
-            }
-            double weight = position - lowerIndex;
-            return sortedValues.get(lowerIndex) * (1.0 - weight)
-                    + sortedValues.get(upperIndex) * weight;
-        }
-        
     }
 
 }
