@@ -24,6 +24,7 @@ import problem.StreamAnonymizationProblem;
 import problem.StreamAnonymizationProblem_2ObjectivesPerf;
 import problem.StreamAnonymizationProblem_2ObjectivesRes;
 import problem.utils.PrivacyMetricChoice;
+import usecase.nhanes.NhanesStreamAnonymizationProblem;
 
 @Discoverable(prefixTemplate = "anonym.problem")
 public class Problems {
@@ -50,8 +51,16 @@ public class Problems {
             @Param(value = "privacyMetric", dS = "K_ANONYMITY_CARDINALITY") PrivacyMetricChoice privacyMetric,
             @Param(value = "name", iS = "{inputCsvPath}") String name) {
 
-        // TODO add more parameters, e.g. to specify which ops to use without changing grammar
         return new EnhancedStreamAnonymizationProblem(inputCsvPath, privacyMetric);
+    }
+
+    @Cacheable
+    public static NhanesStreamAnonymizationProblem nhanesStreamAnonymizationProblem(
+            @Param("inputCsvPath") String inputCsvPath,
+            @Param(value = "privacyMetric", dS = "K_ANONYMITY_CARDINALITY") PrivacyMetricChoice privacyMetric,
+            @Param(value = "name", iS = "{inputCsvPath}") String name) {
+
+        return new NhanesStreamAnonymizationProblem(inputCsvPath, privacyMetric);
     }
 
     // Create a problem with 3 objectives
