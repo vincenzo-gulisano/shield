@@ -1,6 +1,5 @@
 package query;
 
-import common.util.Util;
 import component.operator.Operator;
 import component.operator.in1.aggregate.BaseTimeWindowAddRemove;
 import component.operator.in1.aggregate.TimeWindowAddRemove;
@@ -10,6 +9,7 @@ import component.source.Source;
 import component.source.SourceFunction;
 import event.GenericEvent;
 import metrics.performance.utils.StreamStatsWindow;
+import usecase.common.CollectionSourceFactory;
 
 import java.util.*;
 
@@ -34,7 +34,7 @@ public class MainQueryGeoLife {
         Query query = new Query();
 
         // Create and add a source that reads from the provided in-memory list
-        SourceFunction<GenericEvent> collectionSource = createCollectionSource(inputStream);
+        SourceFunction<GenericEvent> collectionSource = CollectionSourceFactory.fromList(inputStream);
         Source<GenericEvent> inputSource = query.addBaseSource("I1_" + queryId, collectionSource);
 
         // Window of 3 hours, sliding every 1 hour
@@ -125,37 +125,6 @@ public class MainQueryGeoLife {
         query.deActivate();
 
         return new QueryResult(collectedEvents, statsWindow);
-    }
-
-    // Helper method to create a Source Function that reads from a list
-    private static <T> SourceFunction<T> createCollectionSource(final List<T> list) {
-        return new SourceFunction<>() {
-            private int currentIndex = 0;
-            private boolean isFinished = false;
-            private static final long IDLE_SLEEP = 10;
-            private boolean enabled;
-
-            @Override
-            public T get() {
-                if (isFinished) {
-                    Util.sleep(IDLE_SLEEP);
-                    return null;
-                }
-                if (currentIndex < list.size()) {
-                    T item = list.get(currentIndex);
-                    currentIndex++;
-                    return item;
-                } else {
-                    isFinished = true;
-                    return null;
-                }
-            }
-            @Override public boolean isInputFinished() { return isFinished; }
-            @Override public void enable() { this.enabled = true; }
-            @Override public boolean isEnabled() { return enabled; }
-            @Override public void disable() { this.enabled = false; }
-            @Override public boolean canRun() { return !isFinished; }
-        };
     }
 
     // Aggregation logic specific to the GeoLife dataset

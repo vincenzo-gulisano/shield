@@ -1,9 +1,7 @@
 package query;
 
-import common.util.Util;
 import common.util.backoff.InactiveBackoff;
 import component.operator.Operator;
-import component.operator.in1.map.MapFunction;
 import component.sink.Sink;
 import component.sink.SinkFunction;
 import component.source.Source;
@@ -12,6 +10,7 @@ import io.github.ericmedvet.jgea.core.representation.graph.Graph;
 import io.github.ericmedvet.jgea.core.representation.graph.Graph.Arc;
 import mappers.QueryMapper.ArcType;
 import mappers.QueryMapper.OperatorRepresentation;
+import usecase.common.CollectionSourceFactory;
 import usecase.common.Tuple;
 
 import org.slf4j.Logger;
@@ -36,7 +35,7 @@ public class LiebreAnonymizationQueryFromGraph {
 
         Query query = new Query(100000);
 
-        SourceFunction<Tuple> collectionSource = createCollectionSource(inputTuples);
+        SourceFunction<Tuple> collectionSource = CollectionSourceFactory.fromList(inputTuples, 0L);
 
         Source<Tuple> source = null;
         Sink<Tuple> sink = null;
@@ -193,53 +192,4 @@ public class LiebreAnonymizationQueryFromGraph {
         return collectedEvents;
     }
 
-    private static <T> SourceFunction<T> createCollectionSource(final List<T> list) {
-        return new SourceFunction<T>() {
-            private int currentIndex = 0;
-            private boolean isFinished = false;
-            private static final long IDLE_SLEEP = 0;
-            private boolean enabled;
-
-            @Override
-            public T get() {
-                if (isFinished) {
-                    Util.sleep(IDLE_SLEEP);
-                    return null;
-                }
-                if (currentIndex < list.size()) {
-                    T item = list.get(currentIndex);
-                    currentIndex++;
-                    return item;
-                } else {
-                    isFinished = true;
-                    return null;
-                }
-            }
-
-            @Override
-            public boolean isInputFinished() {
-                return isFinished;
-            }
-
-            @Override
-            public void enable() {
-                this.enabled = true;
-            }
-
-            @Override
-            public boolean isEnabled() {
-                return enabled;
-            }
-
-            @Override
-            public void disable() {
-                this.enabled = false;
-            }
-
-            @Override
-            public boolean canRun() {
-                return !isFinished;
-            }
-        };
-    }
 }

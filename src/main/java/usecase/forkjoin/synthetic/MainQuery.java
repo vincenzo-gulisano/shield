@@ -1,6 +1,5 @@
 package usecase.forkjoin.synthetic;
 
-import common.util.Util;
 import common.util.backoff.InactiveBackoff;
 import component.operator.Operator;
 import component.operator.in1.map.MapFunction;
@@ -11,6 +10,7 @@ import component.source.Source;
 import component.source.SourceFunction;
 import metrics.performance.utils.StreamStatsWindow;
 import query.Query;
+import usecase.common.CollectionSourceFactory;
 import usecase.common.Tuple;
 
 import java.util.*;
@@ -52,7 +52,7 @@ public class MainQuery {
         Query query = new Query(100000);
 
         // Create and add a source that reads from the provided in-memory list
-        SourceFunction<Tuple> collectionSource = createCollectionSource(inputStream);
+        SourceFunction<Tuple> collectionSource = CollectionSourceFactory.fromList(inputStream);
         Source<Tuple> inputSource = query.addBaseSource("I1-" + queryId, collectionSource);
 
         RouterOperator<Tuple> router = query.addRouterOperator("router-" + queryId);
@@ -174,57 +174,6 @@ public class MainQuery {
                     && tuple.getField("f2") > f2Min
                     && tuple.getField("f2") < f2Max;
         }
-    }
-
-    // Helper method to create a Source Function that reads from a list
-    private static <T> SourceFunction<T> createCollectionSource(final List<T> list) {
-        return new SourceFunction<>() {
-            private int currentIndex = 0;
-            private boolean isFinished = false;
-            private static final long IDLE_SLEEP = 10;
-            private boolean enabled;
-
-            @Override
-            public T get() {
-                if (isFinished) {
-                    Util.sleep(IDLE_SLEEP);
-                    return null;
-                }
-                if (currentIndex < list.size()) {
-                    T item = list.get(currentIndex);
-                    currentIndex++;
-                    return item;
-                } else {
-                    isFinished = true;
-                    return null;
-                }
-            }
-
-            @Override
-            public boolean isInputFinished() {
-                return isFinished;
-            }
-
-            @Override
-            public void enable() {
-                this.enabled = true;
-            }
-
-            @Override
-            public boolean isEnabled() {
-                return enabled;
-            }
-
-            @Override
-            public void disable() {
-                this.enabled = false;
-            }
-
-            @Override
-            public boolean canRun() {
-                return !isFinished;
-            }
-        };
     }
 
 }
