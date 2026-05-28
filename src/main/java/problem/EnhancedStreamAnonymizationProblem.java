@@ -52,7 +52,7 @@ import usecase.forkjoin.synthetic.MainQuery.QueryResult;
 public class EnhancedStreamAnonymizationProblem implements
     SimpleMOProblem<Graph<OperatorRepresentation, ArcType>, Double> {
 
-  private static final Logger logger = LoggerFactory.getLogger(StreamAnonymizationProblem.class);
+  private static final Logger logger = LoggerFactory.getLogger(EnhancedStreamAnonymizationProblem.class);
 
   // Define a static counter for unique query ID
   private static final AtomicLong queryCounter = new AtomicLong(0);
