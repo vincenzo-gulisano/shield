@@ -1,23 +1,13 @@
-package usecase.forkjoin.synthetic;
+package usecase.nhanes;
 
-import common.util.backoff.InactiveBackoff;
 import component.operator.Operator;
-import component.operator.in1.aggregate.BaseTimeWindowAdd;
-import component.operator.in1.aggregate.TimeWindowAdd;
-import component.operator.in1.aggregate.Window;
-import component.operator.in1.map.MapFunction;
 import component.operator.router.RouterOperator;
-import component.operator.union.UnionOperator;
 import component.sink.Sink;
 import component.source.Source;
-import component.source.SourceFunction;
-import metrics.performance.utils.StreamStatsWindow;
 import query.Query;
 import usecase.common.CollectionSourceFactory;
 import usecase.common.ListTuple;
 import usecase.common.Tuple;
-import usecase.forkjoin.synthetic.OneCoreSyntheticTupleCsvGenerator;
-
 import java.util.*;
 
 public class MainQuery {
@@ -37,7 +27,7 @@ public class MainQuery {
         // Create and add a source that reads from the provided in-memory list
         Source<Tuple> inputSource = query.addBaseSource("I-" + queryId, CollectionSourceFactory.fromList(inputStream));
 
-        query.<Tuple, Tuple>addMapOperator("M-" + queryId, t -> {
+        Operator<Tuple, Tuple> cohortExtractor =  query.<Tuple, Tuple>addMapOperator("M-" + queryId, t -> {
             // Cohort is based on gender (f1) and age (f2)
             double age = t.getField("f2");
             int gender = (int) t.getField("f1");
@@ -65,25 +55,31 @@ public class MainQuery {
 
         Operator<ListTuple, Tuple> agg1unpack = query.addFlatMapOperator("StatsAUnpack-"+queryId, lt -> lt.getTuples().stream().toList());
 
-        // Final Sink that adds every valid event to the results list
-        Sink<Tuple> sink = query.addBaseSink("o1-" + queryId, event -> {
+        Operator<Tuple, ListTuple> agg2 = query.addTimeAggregateOperator("OutlierA-"+queryId,1,1, new OutlierTimeWindow());
+
+        Operator<ListTuple, Tuple> agg2unpack = query.addFlatMapOperator("OutlierAUnpack-"+queryId, lt -> lt.getTuples().stream().toList());
+
+        Sink<Tuple> sink1 = query.addBaseSink("O1-" + queryId, event -> {
             outputAggregatedStats.add(event);
         });
 
-        // // Connect the pipeline components
-        // query.connect(inputSource, recorderAfterSource)
-        // .connect(recorderAfterSource, router)
-        // .connect(router, b1f)
-        // .connect(router, b2f)
-        // .connect(b1f, recorderAfterBranch1)
-        // .connect(b2f, recorderAfterBranch2)
-        // .connect(recorderAfterBranch1, union, InactiveBackoff.INSTANCE)
-        // .connect(recorderAfterBranch2, union, InactiveBackoff.INSTANCE)
-        // .connect(union, sink);
+        Sink<Tuple> sink2 = query.addBaseSink("O2-" + queryId, event -> {
+            outputOutliers.add(event);
+        });
+
+        // Connect the pipeline components
+        query.connect(inputSource, cohortExtractor)
+        .connect(cohortExtractor, router)
+        .connect(router, agg1)
+        .connect(agg1, agg1unpack)
+        .connect(router, agg2)
+        .connect(agg2, agg2unpack)
+        .connect(agg1unpack, sink1)
+        .connect(agg2unpack, sink2);
 
         query.activate();
 
-        while (sink.isEnabled()) {
+        while (sink1.isEnabled() || sink2.isEnabled()) {
             try {
                 Thread.sleep(10);
             } catch (InterruptedException e) {

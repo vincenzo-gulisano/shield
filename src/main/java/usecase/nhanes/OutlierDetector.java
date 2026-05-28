@@ -2,6 +2,7 @@ package usecase.nhanes;
 
 import java.util.ArrayList;
 import java.util.List;
+import usecase.nhanes.TupleFeatureStats.FeatureStats;
 import usecase.common.Tuple;
 
 /**
@@ -22,9 +23,6 @@ public final class OutlierDetector {
     public record ScoredTuple(Tuple tuple, double score) {
     }
 
-    private record FeatureReference(double median, double iqr) {
-    }
-
     private OutlierDetector() {
     }
 
@@ -39,12 +37,11 @@ public final class OutlierDetector {
             return List.of();
         }
 
-        int numFields = tuples.getFirst().getNumFields();
-        List<FeatureReference> references = computeFeatureReferences(tuples, numFields);
+        TupleFeatureStats stats = TupleFeatureStats.compute(tuples);
         List<ScoredTuple> scoredTuples = new ArrayList<>(tuples.size());
         for (Tuple tuple : tuples) {
-            validateNumFields(tuple, numFields);
-            scoredTuples.add(new ScoredTuple(tuple, score(tuple, references)));
+            validateNumFields(tuple, stats.features().size());
+            scoredTuples.add(new ScoredTuple(tuple, score(tuple, stats.features())));
         }
         return scoredTuples;
     }
@@ -96,7 +93,7 @@ public final class OutlierDetector {
             scores.add(scoredTuple.score());
         }
         scores.sort(Double::compareTo);
-        double minScore = percentile(scores, scoreQuantile);
+        double minScore = TupleFeatureStats.percentile(scores, scoreQuantile);
 
         List<Tuple> outliers = new ArrayList<>();
         for (ScoredTuple scoredTuple : scoredTuples) {
@@ -107,65 +104,21 @@ public final class OutlierDetector {
         return outliers;
     }
 
-    private static List<FeatureReference> computeFeatureReferences(List<Tuple> tuples, int numFields) {
-        List<List<Double>> sortedValuesByField = new ArrayList<>(numFields);
-        for (int i = 0; i < numFields; i++) {
-            sortedValuesByField.add(new ArrayList<>());
-        }
-
-        for (Tuple tuple : tuples) {
-            validateNumFields(tuple, numFields);
-            for (int i = 0; i < numFields; i++) {
-                double value = tuple.getField("f" + (i + 1));
-                if (!Double.isNaN(value)) {
-                    sortedValuesByField.get(i).add(value);
-                }
-            }
-        }
-
-        List<FeatureReference> references = new ArrayList<>(numFields);
-        for (List<Double> values : sortedValuesByField) {
-            values.sort(Double::compareTo);
-            double median = percentile(values, 0.50);
-            double iqr = percentile(values, 0.75) - percentile(values, 0.25);
-            references.add(new FeatureReference(median, iqr));
-        }
-        return references;
-    }
-
-    private static double score(Tuple tuple, List<FeatureReference> references) {
+    private static double score(Tuple tuple, List<FeatureStats> features) {
         double sumSquared = 0.0;
         int validDimensions = 0;
-        for (int i = 0; i < references.size(); i++) {
+        for (int i = 0; i < features.size(); i++) {
             double value = tuple.getField("f" + (i + 1));
-            FeatureReference reference = references.get(i);
-            if (Double.isNaN(value) || Double.isNaN(reference.median())) {
+            FeatureStats feature = features.get(i);
+            if (Double.isNaN(value) || Double.isNaN(feature.median())) {
                 continue;
             }
-            double denominator = Math.max(Math.abs(reference.iqr()), EPSILON);
-            double robustZ = (value - reference.median()) / denominator;
+            double denominator = Math.max(Math.abs(feature.iqr()), EPSILON);
+            double robustZ = (value - feature.median()) / denominator;
             sumSquared += robustZ * robustZ;
             validDimensions++;
         }
         return validDimensions == 0 ? Double.NaN : Math.sqrt(sumSquared);
-    }
-
-    private static double percentile(List<Double> sortedValues, double p) {
-        if (sortedValues.isEmpty()) {
-            return Double.NaN;
-        }
-        if (sortedValues.size() == 1) {
-            return sortedValues.get(0);
-        }
-        double position = p * (sortedValues.size() - 1);
-        int lowerIndex = (int) Math.floor(position);
-        int upperIndex = (int) Math.ceil(position);
-        if (lowerIndex == upperIndex) {
-            return sortedValues.get(lowerIndex);
-        }
-        double weight = position - lowerIndex;
-        return sortedValues.get(lowerIndex) * (1.0 - weight)
-                + sortedValues.get(upperIndex) * weight;
     }
 
     private static void validateNumFields(Tuple tuple, int expectedNumFields) {
