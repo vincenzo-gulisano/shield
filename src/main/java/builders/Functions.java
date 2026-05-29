@@ -21,6 +21,8 @@ import io.github.ericmedvet.jnb.core.Cacheable;
 import io.github.ericmedvet.jnb.core.Discoverable;
 import io.github.ericmedvet.jnb.core.Param;
 import io.github.ericmedvet.jnb.datastructure.NamedFunction;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.function.Function;
 import mappers.QueryMapper;
 
@@ -153,6 +155,23 @@ public class Functions {
         }
       }
       return count;
+    };
+    return NamedFunction.from(f, name).compose(beforeF);
+  }
+
+  @Cacheable
+  public static <X, N, A> NamedFunction<X, Integer> graphUsedFieldsCount(
+      @Param(value = "name", dS = "graph.used.fields.count") String name,
+      @Param(value = "of", dNPM = "f.identity()") Function<X, Graph<N, A>> beforeF) {
+    Function<Graph<N, A>, Integer> f = g -> {
+      Set<String> fields = new HashSet<>();
+      for (N node : g.nodes()) {
+        String field = QueryMapper.fieldUsedBy(node);
+        if (field != null) {
+          fields.add(field);
+        }
+      }
+      return fields.size();
     };
     return NamedFunction.from(f, name).compose(beforeF);
   }

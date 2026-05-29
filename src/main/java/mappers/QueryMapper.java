@@ -329,6 +329,22 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     return sb.toString();
   }
 
+  public static String fieldUsedBy(Object node) {
+    if (node instanceof QueryMapper.FilterOperator filterOperator) {
+      return filterOperator.field();
+    }
+    if (node instanceof QueryMapper.MapNoise mapNoise) {
+      return mapNoise.field();
+    }
+    if (node instanceof QueryMapper.MapRIR mapRIR) {
+      return mapRIR.field();
+    }
+    if (node instanceof QueryMapper.MapAggregate mapAggregate) {
+      return mapAggregate.field();
+    }
+    return null;
+  }
+
   // public enum OperatorType {
   // FILTER,
   // MAP_DUPLICATE,

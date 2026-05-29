@@ -19,3 +19,4 @@ outputs/
 ### Mac OS ###
 .DS_Store
 vincenzo/
+python/__pycache__/

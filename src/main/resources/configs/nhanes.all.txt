@@ -16,15 +16,15 @@ ea.experiment(
       %    maxTreeH = $maxTreeH;
       %    grammar = ea.grammar.fromFile(
       %      path = "src/main/resources/grammars/nhanes/nhanes.allbutforks.bnf"));
-      %  mapper = anonym.mapper.queryMapper(
+      %  mapper = anonym.mapper.queryMapperWithSampler(
       %    fieldValueSampler = anonym.valueSampler.nhanesTupleFieldValueSampler(
       %      inputCsvPath = "datasets/nhanes.csv";
       %      seed = 0
       %    )
       %  );
       %  descriptors = [
-      %    ea.s.me.d.descriptor(f = anonym.f.graphFiltersCount(of = ea.f.solution()); min = 0; max = 4; nOfBins = 5);
-      %    ea.s.me.d.descriptor(f = anonym.f.graphForksCount(of = ea.f.solution()); min = 0; max = 4; nOfBins = 5)
+      %    ea.s.me.d.descriptor(f = anonym.f.graphUsedFieldsCount(of = ea.f.solution()); min = 0; max = 6; nOfBins = 7);
+      %    ea.s.me.d.descriptor(f = nhanes.f.fieldCategoryMask(of = ea.f.solution()); min = 0; max = 7; nOfBins = 8)
       %  ]
       %)%;
       ea.s.nsga2(
