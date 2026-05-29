@@ -54,15 +54,19 @@ public class NhanesStreamAnonymizationProblem implements
   private final PrivacyMetricChoice privacyMetricChoice;
   private final QueryResult mainQueryResults;
   private final KAnonymityPrivacyCardinality privacyMetricCalculator;
+  private final double fidelityF1Threshold;
+  private final double semanticsF1Threshold;
 
   private final List<Tuple> inputTuples;
 
   public NhanesStreamAnonymizationProblem(String inputCsvPath,
-      PrivacyMetricChoice privacyMetric) {
+      PrivacyMetricChoice privacyMetric,
+      double fidelityF1Threshold,
+      double semanticsF1Threshold) {
 
     logger.info(
-        "Initializing the NhanesStreamAnonymizationProblem with input CSV: {}, and privacy metric: {}",
-        inputCsvPath, privacyMetric);
+        "Initializing the NhanesStreamAnonymizationProblem with input CSV: {}, privacy metric: {}, fidelity F1 threshold: {}, and semantics F1 threshold: {}",
+        inputCsvPath, privacyMetric, fidelityF1Threshold, semanticsF1Threshold);
 
     inputTuples = NhanesTupleLoader.load();
     logger.info("Loaded {} tuples from {}", inputTuples.size(), inputCsvPath);
@@ -74,17 +78,29 @@ public class NhanesStreamAnonymizationProblem implements
         mainQueryResults.outputAggregatedStats().size(), mainQueryResults.outputOutliers().size());
 
     this.privacyMetricChoice = privacyMetric;
+    this.fidelityF1Threshold = fidelityF1Threshold;
+    this.semanticsF1Threshold = semanticsF1Threshold;
     List<String> attributes = List.of(Tuple.getFieldNames(inputTuples.get(0).getNumFields()));
     this.privacyMetricCalculator = new KAnonymityPrivacyCardinality(inputTuples, 50, attributes);
 
     logger.info("Empty query privacy, fidelity, and semantics scores: {}, {}, and {}",
-        privacyMetricCalculator.applyWithQuantile99(inputTuples, inputTuples),
+        privacyScore(inputTuples),
         TupleMatchingScore.f1(TupleMatchingScore.groupByTimestampAndKey(mainQueryResults.outputAggregatedStats()),
-            TupleMatchingScore.groupByTimestampAndKey(mainQueryResults.outputAggregatedStats()), 0.05,
+            TupleMatchingScore.groupByTimestampAndKey(mainQueryResults.outputAggregatedStats()), fidelityF1Threshold,
             DistanceMode.RELATIVE),
         TupleMatchingScore.f1(TupleMatchingScore.groupByTimestampAndKey(mainQueryResults.outputOutliers()),
-            TupleMatchingScore.groupByTimestampAndKey(mainQueryResults.outputOutliers()), 0.05, DistanceMode.RELATIVE));
+            TupleMatchingScore.groupByTimestampAndKey(mainQueryResults.outputOutliers()), semanticsF1Threshold,
+            DistanceMode.RELATIVE));
 
+  }
+
+  private double privacyScore(List<Tuple> modifiedEvents) {
+    return switch (privacyMetricChoice) {
+      case K_ANONYMITY_CARDINALITY_MAX -> privacyMetricCalculator.applyWithMax(inputTuples, modifiedEvents);
+      case K_ANONYMITY_CARDINALITY_Q99 -> privacyMetricCalculator.applyWithQuantile99(inputTuples,
+          modifiedEvents);
+      case K_ANONYMITY_CARDINALITY -> privacyMetricCalculator.apply(inputTuples, modifiedEvents);
+    };
   }
 
   private final static SequencedMap<String, Comparator<Double>> OBJECTIVES = new TreeMap<>(
@@ -123,19 +139,7 @@ public class NhanesStreamAnonymizationProblem implements
               (System.currentTimeMillis() - startTime) / 1000.0);
         }
 
-        double privacyScore;
-        // Based on the user choice, calculate the correct privacy metric
-        switch (privacyMetricChoice) {
-          case K_ANONYMITY_CARDINALITY_MAX ->
-            privacyScore = privacyMetricCalculator.applyWithMax(inputTuples, modifiedEvents);
-          case K_ANONYMITY_CARDINALITY_Q99 ->
-            privacyScore = privacyMetricCalculator.applyWithQuantile99(inputTuples,
-                modifiedEvents);
-          case K_ANONYMITY_CARDINALITY ->
-            privacyScore = privacyMetricCalculator.apply(inputTuples, modifiedEvents);
-          default -> privacyScore = privacyMetricCalculator.apply(inputTuples, modifiedEvents);
-        }
-        qualities.put("privacy", privacyScore);
+        qualities.put("privacy", privacyScore(modifiedEvents));
 
         // Case with empty modified datastream
         if (modifiedEvents.isEmpty()) {
@@ -157,13 +161,15 @@ public class NhanesStreamAnonymizationProblem implements
                 (System.currentTimeMillis() - startTime) / 1000.0);
           }
 
-          qualities.put("semantics",
-              TupleMatchingScore.f1(TupleMatchingScore.groupByTimestampAndKey(mainQueryResults.outputAggregatedStats()),
-                  TupleMatchingScore.groupByTimestampAndKey(modifiedOutcome.outputAggregatedStats()), 0.05,
-                  DistanceMode.RELATIVE));
           qualities.put("fidelity",
+              TupleMatchingScore.f1(TupleMatchingScore.groupByTimestampAndKey(mainQueryResults.outputAggregatedStats()),
+                  TupleMatchingScore.groupByTimestampAndKey(modifiedOutcome.outputAggregatedStats()),
+                  fidelityF1Threshold,
+                  DistanceMode.RELATIVE));
+          qualities.put("semantics",
               TupleMatchingScore.f1(TupleMatchingScore.groupByTimestampAndKey(mainQueryResults.outputOutliers()),
-                  TupleMatchingScore.groupByTimestampAndKey(modifiedOutcome.outputOutliers()), 0.05,
+                  TupleMatchingScore.groupByTimestampAndKey(modifiedOutcome.outputOutliers()),
+                  semanticsF1Threshold,
                   DistanceMode.RELATIVE));
 
         }

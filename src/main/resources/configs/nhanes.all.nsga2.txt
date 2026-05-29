@@ -9,9 +9,8 @@ ea.experiment(
     * [m.defaultRG()])
     * (solver = (stop = ea.sc.nOfQualityEvaluations(n = 20000))
     * [
-
-      ea.s.mapElites(
-        nPop = 100; % note: maybe pick according to possible number of cells of the archive, because map elites keeps only 1 and only 1 per cell
+      ea.s.nsga2(
+        nPop = 200;
         representation = ea.r.cfgTree(
           minTreeH = $minTreeH;
           maxTreeH = $maxTreeH;
@@ -22,33 +21,16 @@ ea.experiment(
             inputCsvPath = "datasets/nhanes.csv";
             seed = 0
           )
-        );
-        descriptors = [
-          ea.s.me.d.descriptor(f = anonym.f.graphUsedFieldsCount(of = ea.f.solution()); min = 0; max = 6; nOfBins = 7);
-          ea.s.me.d.descriptor(f = nhanes.f.fieldCategoryMask(of = ea.f.solution()); min = 0; max = 7; nOfBins = 8)
-        ]
+        )
       )
-
- %     ea.s.nsga2(
- %       nPop = 200;
- %       representation = ea.r.cfgTree(
- %         minTreeH = $minTreeH;
- %         maxTreeH = $maxTreeH;
- %         grammar = ea.grammar.fromFile(
- %           path = "src/main/resources/grammars/nhanes/nhanes.allbutforks.bnf"));
- %       mapper = anonym.mapper.queryMapperWithSampler(
- %         fieldValueSampler = anonym.valueSampler.nhanesTupleFieldValueSampler(
- %           inputCsvPath = "datasets/nhanes.csv";
- %           seed = 0
- %         )
- %       )
- %     )
     ])
     * [
     ea.run(
       problem = anonym.problem.nhanesStreamAnonymizationProblem(
         inputCsvPath = "datasets/nhanes.csv";
-        privacyMetric = K_ANONYMITY_CARDINALITY_Q99
+        privacyMetric = K_ANONYMITY_CARDINALITY_MAX;
+        fidelityF1Threshold = 0.05;
+        semanticsF1Threshold = 0.2
       )
     )
   ];
