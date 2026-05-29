@@ -1,9 +1,8 @@
 package metrics.privacy.utils;
 
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.List;
-import java.util.PriorityQueue;
 
 // KDTree Implementation
 public class KDTree {
@@ -62,15 +61,34 @@ public class KDTree {
 
     // Method to find distances of k nearest tuples
     public List<Double> findNearestDistances(double[] target, int k) {
-        // Priority Queue to keep track of the k smallest distances so far
-        // The head of the queue is the largest distance among the k best
-        PriorityQueue<Double> pq = new PriorityQueue<>(k, Collections.reverseOrder());
-        searchKNearest(root, target, k, pq);
-        return new ArrayList<>(pq);
+        BoundedMaxHeap nearestDistances = findNearestDistanceHeap(target, k);
+        double[] values = nearestDistances.toArray();
+        List<Double> distances = new ArrayList<>(values.length);
+        for (double value : values) {
+            distances.add(value);
+        }
+        return distances;
+    }
+
+    public double findNearestDistanceStdDev(double[] target, int k) {
+        BoundedMaxHeap nearestDistances = findNearestDistanceHeap(target, k);
+        if (nearestDistances.size() < 2) {
+            return Double.NaN;
+        }
+        return nearestDistances.sqrtStdDev();
+    }
+
+    private BoundedMaxHeap findNearestDistanceHeap(double[] target, int k) {
+        if (k < 1) {
+            throw new IllegalArgumentException("k must be positive");
+        }
+        BoundedMaxHeap nearestDistances = new BoundedMaxHeap(k);
+        searchKNearest(root, target, nearestDistances);
+        return nearestDistances;
     }
 
     // Search for the k nearest tuples with pruning
-    private void searchKNearest(Node node, double[] target, int k, PriorityQueue<Double> pq) {
+    private void searchKNearest(Node node, double[] target, BoundedMaxHeap nearestDistances) {
         if (node == null) return;
 
         // Calculate distance between target and current node
@@ -78,12 +96,7 @@ public class KDTree {
 
         // Add to queue if valid
         if (!Double.isNaN(distSq) && !Double.isInfinite(distSq)) {
-            if (pq.size() < k) {
-                pq.add(distSq);
-            } else if (distSq < pq.peek()) {
-                pq.poll(); // Remove worst of the best
-                pq.add(distSq); // Add new candidate
-            }
+            nearestDistances.offer(distSq);
         }
 
         // Determine which child to visit first
@@ -93,8 +106,8 @@ public class KDTree {
 
         // If we have NaNs on the splitting axis, we cannot make a binary decision so we visit both
         if (Double.isNaN(targetVal) || Double.isNaN(nodeVal)) {
-            searchKNearest(node.left, target, k, pq);
-            searchKNearest(node.right, target, k, pq);
+            searchKNearest(node.left, target, nearestDistances);
+            searchKNearest(node.right, target, nearestDistances);
             return;
         }
 
@@ -104,17 +117,17 @@ public class KDTree {
         Node far = diff < 0 ? node.right : node.left;
 
         // Visit the neared side
-        searchKNearest(near, target, k, pq);
+        searchKNearest(near, target, nearestDistances);
 
         // Pruning logic
         boolean mustVisitFar = false;
-        if (pq.size() < k)
+        if (!nearestDistances.isFull())
             // If we haven't found k tuples yet, we must search everywhere
             mustVisitFar = true;
-        else if (diffSq < (pq.peek() * maxDims))
+        else if (diffSq < (nearestDistances.max() * maxDims))
             mustVisitFar = true;
         if (!mustVisitFar && far == node.right && node.rightHasNaNs) mustVisitFar = true;
-        if (mustVisitFar) searchKNearest(far, target, k, pq);
+        if (mustVisitFar) searchKNearest(far, target, nearestDistances);
     }
 
     // Calculate Mean Squared Distance
@@ -130,5 +143,92 @@ public class KDTree {
         }
         if (valid == 0) return Double.POSITIVE_INFINITY;
         return sum / valid;
+    }
+
+    private static final class BoundedMaxHeap {
+        private final double[] values;
+        private int size;
+
+        private BoundedMaxHeap(int capacity) {
+            values = new double[capacity];
+        }
+
+        private void offer(double value) {
+            if (size < values.length) {
+                values[size] = value;
+                siftUp(size);
+                size++;
+            } else if (value < values[0]) {
+                values[0] = value;
+                siftDown(0);
+            }
+        }
+
+        private boolean isFull() {
+            return size == values.length;
+        }
+
+        private double max() {
+            return values[0];
+        }
+
+        private int size() {
+            return size;
+        }
+
+        private double[] toArray() {
+            return Arrays.copyOf(values, size);
+        }
+
+        private double sqrtStdDev() {
+            double sum = 0.0;
+            for (int i = 0; i < size; i++) {
+                sum += Math.sqrt(values[i]);
+            }
+            double mean = sum / size;
+
+            double sqDiff = 0.0;
+            for (int i = 0; i < size; i++) {
+                double diff = Math.sqrt(values[i]) - mean;
+                sqDiff += diff * diff;
+            }
+            return Math.sqrt(Math.max(0.0, sqDiff / (size - 1)));
+        }
+
+        private void siftUp(int index) {
+            while (index > 0) {
+                int parent = (index - 1) / 2;
+                if (values[parent] >= values[index]) {
+                    return;
+                }
+                swap(parent, index);
+                index = parent;
+            }
+        }
+
+        private void siftDown(int index) {
+            while (true) {
+                int left = index * 2 + 1;
+                int right = left + 1;
+                int largest = index;
+                if (left < size && values[left] > values[largest]) {
+                    largest = left;
+                }
+                if (right < size && values[right] > values[largest]) {
+                    largest = right;
+                }
+                if (largest == index) {
+                    return;
+                }
+                swap(index, largest);
+                index = largest;
+            }
+        }
+
+        private void swap(int a, int b) {
+            double tmp = values[a];
+            values[a] = values[b];
+            values[b] = tmp;
+        }
     }
 }

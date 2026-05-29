@@ -108,15 +108,20 @@ public class NhanesStreamAnonymizationProblem implements
       try {
         // Create an executable Liebre query and execute this anonymization query
         LiebreAnonymizationQueryFromGraph liebreExecutor = new LiebreAnonymizationQueryFromGraph();
+        boolean debugEnabled = logger.isDebugEnabled();
 
-        logger.info("Starting the processing of anonimization query #{}", counter);
-        long startTime = System.currentTimeMillis();
+        if (debugEnabled) {
+          logger.debug("Starting the processing of anonimization query #{}", counter);
+        }
+        long startTime = debugEnabled ? System.currentTimeMillis() : 0L;
         List<Tuple> modifiedEvents = liebreExecutor.processAnonymizationQuery(g, inputTuples);
-        logger.info(
-            "Finished processing anonymization query #{}, input tuples: {}, output tuples: {}, total time: {}s",
-            counter,
-            inputTuples.size(), modifiedEvents.size(),
-            (System.currentTimeMillis() - startTime) / 1000.0);
+        if (debugEnabled) {
+          logger.debug(
+              "Finished processing anonymization query #{}, input tuples: {}, output tuples: {}, total time: {}s",
+              counter,
+              inputTuples.size(), modifiedEvents.size(),
+              (System.currentTimeMillis() - startTime) / 1000.0);
+        }
 
         double privacyScore;
         // Based on the user choice, calculate the correct privacy metric
@@ -139,14 +144,18 @@ public class NhanesStreamAnonymizationProblem implements
 
         } else {
 
-          logger.info("Starting the processing of modified data on main query #{}", counter);
-          startTime = System.currentTimeMillis();
+          if (debugEnabled) {
+            logger.debug("Starting the processing of modified data on main query #{}", counter);
+          }
+          startTime = debugEnabled ? System.currentTimeMillis() : 0L;
           QueryResult modifiedOutcome = MainQuery.process(modifiedEvents, queryId);
-          logger.info(
-              "Finished processing modified data on main query #{}, input tuples: {}, output tuples: aggregatestats {} and outliers {}, total time: {}s",
-              counter, modifiedEvents.size(), modifiedOutcome.outputAggregatedStats().size(),
-              modifiedOutcome.outputOutliers().size(),
-              (System.currentTimeMillis() - startTime) / 1000.0);
+          if (debugEnabled) {
+            logger.debug(
+                "Finished processing modified data on main query #{}, input tuples: {}, output tuples: aggregatestats {} and outliers {}, total time: {}s",
+                counter, modifiedEvents.size(), modifiedOutcome.outputAggregatedStats().size(),
+                modifiedOutcome.outputOutliers().size(),
+                (System.currentTimeMillis() - startTime) / 1000.0);
+          }
 
           qualities.put("semantics",
               TupleMatchingScore.f1(TupleMatchingScore.groupByTimestampAndKey(mainQueryResults.outputAggregatedStats()),

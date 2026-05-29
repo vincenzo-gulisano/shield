@@ -24,11 +24,13 @@ public final class NhanesUseCaseSmokeTest {
     private static void printPrivacyScore() {
         List<Tuple> tuples = NhanesTupleLoader.load();
         List<String> attributes = List.of(Tuple.getFieldNames(tuples.getFirst().getNumFields()));
-        KAnonymityPrivacyCardinality privacyMetricCalculator =
-                new KAnonymityPrivacyCardinality(tuples, 50, attributes);
-
-        System.out.printf("privacy=%f%n",
-                privacyMetricCalculator.applyWithQuantile99(tuples, tuples));
+        for (int k=2; k<=100; k++) {
+            KAnonymityPrivacyCardinality privacyMetricCalculator =
+                    new KAnonymityPrivacyCardinality(tuples, k, attributes);
+            System.out.printf("privacy@k=%d: %f (99) %f (max)%n", k,
+                    privacyMetricCalculator.applyWithQuantile99(tuples, tuples),
+                    privacyMetricCalculator.applyWithMax(tuples, tuples));
+        }
     }
 
     private static void testF1Scores() {

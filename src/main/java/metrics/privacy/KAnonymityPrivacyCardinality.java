@@ -1,12 +1,10 @@
 package metrics.privacy;
 
-import event.GenericEvent;
 import io.github.ericmedvet.jgea.core.distance.Distance;
 import metrics.privacy.utils.KDTree;
 import metrics.privacy.utils.MetricUtils;
 
-import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -111,9 +109,10 @@ public class KAnonymityPrivacyCardinality
         if (modified == null) {
             return 0.0;
         }
-        StdDevStats stats = applyWithStdDevStats(original, modified);
+        DoubleAccumulator stddevs = collectStdDevs(original, modified);
+        double q99 = stddevs.quantile(0.99);
         double cardinalityFactor = calculateCardinalityFactor(original, modified);
-        double score = 1.0 / (1.0 + stats.q99);
+        double score = 1.0 / (1.0 + q99);
         return score * cardinalityFactor;
     }
 
@@ -144,43 +143,15 @@ public class KAnonymityPrivacyCardinality
             return stats;
         }
 
-        // Collect raw standard deviation values for each event
-        List<Double> stddevs = new ArrayList<>();
-
-        for (DoubleFieldLookup e : modified) {
-            double[] v = toVector(e);
-            if (MetricUtils.isAllNaN(v)) continue;
-
-            // Retrieve squared distances of the k nearest neighbors
-            List<Double> squaredDistances =
-                    originalTree.findNearestDistances(v, k);
-
-            if (squaredDistances.size() < 2) continue;
-
-            // Convert squared distances to Euclidean distances
-            List<Double> distances = new ArrayList<>();
-            for (Double d2 : squaredDistances) {
-                distances.add(Math.sqrt(d2));
-            }
-
-            // Compute standard deviation of distances
-            double std = MetricUtils.calculateStdDev(distances);
-            if (Double.isNaN(std)) continue;
-
-            stddevs.add(std);
-        }
-
+        DoubleAccumulator stddevs = collectStdDevs(original, modified);
         if (stddevs.isEmpty()) return stats;
 
         // Sort values to compute quantiles
-        Collections.sort(stddevs);
+        stddevs.sort();
         int n = stddevs.size();
 
         // Compute aggregate statistics
-        stats.mean = stddevs.stream()
-                .mapToDouble(Double::doubleValue)
-                .average()
-                .orElse(0.0);
+        stats.mean = stddevs.sum() / n;
 
         stats.min = stddevs.get(0);
         stats.max = stddevs.get(n - 1);
@@ -189,6 +160,30 @@ public class KAnonymityPrivacyCardinality
         stats.q99 = stddevs.get((int) Math.floor(0.99 * (n - 1)));
 
         return stats;
+    }
+
+    private DoubleAccumulator collectStdDevs(
+            List<? extends DoubleFieldLookup> original,
+            List<? extends DoubleFieldLookup> modified) {
+
+        DoubleAccumulator stddevs = new DoubleAccumulator(modified == null ? 0 : modified.size());
+
+        if (original == null || modified == null ||
+                original.isEmpty() || modified.isEmpty()) {
+            return stddevs;
+        }
+
+        for (DoubleFieldLookup e : modified) {
+            double[] v = toVector(e);
+            if (MetricUtils.isAllNaN(v)) continue;
+
+            double std = originalTree.findNearestDistanceStdDev(v, k);
+            if (Double.isNaN(std)) continue;
+
+            stddevs.add(std);
+        }
+
+        return stddevs;
     }
 
     private double calculateCardinalityFactor(List<? extends DoubleFieldLookup> original, List<? extends DoubleFieldLookup> modified) {
@@ -211,5 +206,51 @@ public class KAnonymityPrivacyCardinality
             v[i] = Double.isNaN(val) ? Double.NaN : val * inv;
         }
         return v;
+    }
+
+    private static final class DoubleAccumulator {
+        private double[] values;
+        private int size;
+        private double sum;
+
+        private DoubleAccumulator(int initialCapacity) {
+            values = new double[Math.max(0, initialCapacity)];
+        }
+
+        private void add(double value) {
+            if (size == values.length) {
+                values = Arrays.copyOf(values, Math.max(4, size * 2));
+            }
+            values[size++] = value;
+            sum += value;
+        }
+
+        private boolean isEmpty() {
+            return size == 0;
+        }
+
+        private int size() {
+            return size;
+        }
+
+        private double sum() {
+            return sum;
+        }
+
+        private double get(int index) {
+            return values[index];
+        }
+
+        private double quantile(double p) {
+            if (isEmpty()) {
+                return 0.0;
+            }
+            sort();
+            return values[(int) Math.floor(p * (size - 1))];
+        }
+
+        private void sort() {
+            Arrays.sort(values, 0, size);
+        }
     }
 }

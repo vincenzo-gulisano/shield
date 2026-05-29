@@ -174,14 +174,9 @@ public class LiebreAnonymizationQueryFromGraph {
         // }
         query.activate();
 
-        int numberOfWaitIterations = 0;
         while (sink.isEnabled()) {
             try {
-                Thread.sleep(10);
-                numberOfWaitIterations++;
-                if (numberOfWaitIterations % 500 == 0) {
-                    QueryGraphExporter.printFlushingState(query);
-                }
+                Thread.sleep(1);
 
             } catch (InterruptedException e) {
                 e.printStackTrace();

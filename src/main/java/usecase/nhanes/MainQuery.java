@@ -81,7 +81,7 @@ public class MainQuery {
 
         while (sink1.isEnabled() || sink2.isEnabled()) {
             try {
-                Thread.sleep(10);
+                Thread.sleep(1);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
