@@ -10,7 +10,7 @@ import mappers.QueryMapper.ArcType;
 import mappers.QueryMapper.OperatorRepresentation;
 import usecase.nhanes.NhanesGraphDescriptors;
 
-@Discoverable(prefixTemplate = "anonym.nhanes.function|nhanes.f")
+@Discoverable(prefixTemplate = "nhanes.function|f")
 public class NhanesFunctions {
 
     private NhanesFunctions() {
