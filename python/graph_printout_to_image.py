@@ -6,6 +6,7 @@ import html
 import re
 import shutil
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -124,14 +125,37 @@ def to_dot(nodes: dict[str, Node], arcs: list[tuple[str, str]]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def render(dot_path: Path, output_path: Path) -> None:
+def render(dot_path: Path, output_path: Path, verbose: bool = True) -> None:
     dot = shutil.which("dot")
     if dot is None:
         print(f"Graphviz 'dot' was not found. DOT file written to {dot_path}")
         return
     output_format = output_path.suffix.lstrip(".") or "png"
     subprocess.run([dot, f"-T{output_format}", str(dot_path), "-o", str(output_path)], check=True)
-    print(f"Wrote {output_path}")
+    if verbose:
+        print(f"Wrote {output_path}")
+
+
+def render_graph_printout(
+    text: str,
+    output_path: Path,
+    dot_path: Path | None = None,
+    verbose: bool = True,
+) -> None:
+    nodes, arcs = parse_graph_printout(text)
+    dot_text = to_dot(nodes, arcs)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    if dot_path is not None:
+        dot_path.parent.mkdir(parents=True, exist_ok=True)
+        dot_path.write_text(dot_text)
+        render(dot_path, output_path, verbose)
+        return
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_dot_path = Path(tmp_dir) / (output_path.stem + ".dot")
+        tmp_dot_path.write_text(dot_text)
+        render(tmp_dot_path, output_path, verbose)
 
 
 def main() -> None:
@@ -141,14 +165,7 @@ def main() -> None:
     parser.add_argument("--dot", type=Path, help="Optional path for the intermediate DOT file.")
     args = parser.parse_args()
 
-    nodes, arcs = parse_graph_printout(args.input.read_text())
-    dot_text = to_dot(nodes, arcs)
-
-    dot_path = args.dot or args.output.with_suffix(".dot")
-    dot_path.parent.mkdir(parents=True, exist_ok=True)
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    dot_path.write_text(dot_text)
-    render(dot_path, args.output)
+    render_graph_printout(args.input.read_text(), args.output, args.dot or args.output.with_suffix(".dot"))
 
 
 if __name__ == "__main__":
