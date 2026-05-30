@@ -60,13 +60,15 @@ public class Problems {
             @Param(value = "privacyMetric", dS = "K_ANONYMITY_CARDINALITY") PrivacyMetricChoice privacyMetric,
             @Param(value = "fidelityF1Threshold", dD = 0.05) double fidelityF1Threshold,
             @Param(value = "semanticsF1Threshold", dD = 0.05) double semanticsF1Threshold,
+            @Param(value = "k", dI = 50) int k,
             @Param(value = "name", iS = "{inputCsvPath}") String name) {
 
         return new NhanesStreamAnonymizationProblem(
                 inputCsvPath,
                 privacyMetric,
                 fidelityF1Threshold,
-                semanticsF1Threshold);
+                semanticsF1Threshold,
+                k);
     }
 
     // Create a problem with 3 objectives

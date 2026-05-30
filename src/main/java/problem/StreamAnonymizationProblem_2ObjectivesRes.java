@@ -134,7 +134,9 @@ public class StreamAnonymizationProblem_2ObjectivesRes implements SimpleMOProble
                         case K_ANONYMITY_CARDINALITY_MAX -> privacyScoreEmpty = K_ANONYMITY_PRIVACY_CARDINALITY.applyWithMax(this.originalStream, modifiedEvents);
                         case K_ANONYMITY_CARDINALITY_Q99 -> privacyScoreEmpty = K_ANONYMITY_PRIVACY_CARDINALITY.applyWithQuantile99(this.originalStream, modifiedEvents);
                         case K_ANONYMITY_CARDINALITY -> privacyScoreEmpty = K_ANONYMITY_PRIVACY_CARDINALITY.apply(this.originalStream, modifiedEvents);
-                        default -> privacyScoreEmpty = K_ANONYMITY_PRIVACY_CARDINALITY.apply(this.originalStream, modifiedEvents);
+                        default -> throw new IllegalArgumentException(
+                                "Unsupported privacy metric for StreamAnonymizationProblem_2ObjectivesRes: "
+                                        + privacyMetricChoice);
                     }
                     qualities.put("privacy", privacyScoreEmpty);
                     qualities.put("results-similarity", 0.0);
@@ -151,9 +153,12 @@ public class StreamAnonymizationProblem_2ObjectivesRes implements SimpleMOProble
                         finalPrivacyScore = K_ANONYMITY_PRIVACY_CARDINALITY.applyWithQuantile99(this.originalStream, modifiedEvents);
                         break;
                     case K_ANONYMITY_CARDINALITY:
-                    default:
                         finalPrivacyScore = K_ANONYMITY_PRIVACY_CARDINALITY.apply(this.originalStream, modifiedEvents);
                         break;
+                    default:
+                        throw new IllegalArgumentException(
+                                "Unsupported privacy metric for StreamAnonymizationProblem_2ObjectivesRes: "
+                                        + privacyMetricChoice);
                 }
 
                 // Execute the main query

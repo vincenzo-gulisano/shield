@@ -125,7 +125,9 @@ public class StreamAnonymizationProblem_2ObjectivesPerf implements SimpleMOProbl
                         case K_ANONYMITY_CARDINALITY_MAX -> privacyScoreEmpty = K_ANONYMITY_PRIVACY_CARDINALITY.applyWithMax(this.originalStream, modifiedEvents);
                         case K_ANONYMITY_CARDINALITY_Q99 -> privacyScoreEmpty = K_ANONYMITY_PRIVACY_CARDINALITY.applyWithQuantile99(this.originalStream, modifiedEvents);
                         case K_ANONYMITY_CARDINALITY -> privacyScoreEmpty = K_ANONYMITY_PRIVACY_CARDINALITY.apply(this.originalStream, modifiedEvents);
-                        default -> privacyScoreEmpty = K_ANONYMITY_PRIVACY_CARDINALITY.apply(this.originalStream, modifiedEvents);
+                        default -> throw new IllegalArgumentException(
+                                "Unsupported privacy metric for StreamAnonymizationProblem_2ObjectivesPerf: "
+                                        + privacyMetricChoice);
                     }
                     qualities.put("privacy", privacyScoreEmpty);
                     StreamStatsWindow emptyStats = new StreamStatsWindow(
@@ -147,9 +149,12 @@ public class StreamAnonymizationProblem_2ObjectivesPerf implements SimpleMOProbl
                         finalPrivacyScore = K_ANONYMITY_PRIVACY_CARDINALITY.applyWithQuantile99(this.originalStream, modifiedEvents);
                         break;
                     case K_ANONYMITY_CARDINALITY:
-                    default:
                         finalPrivacyScore = K_ANONYMITY_PRIVACY_CARDINALITY.apply(this.originalStream, modifiedEvents);
                         break;
+                    default:
+                        throw new IllegalArgumentException(
+                                "Unsupported privacy metric for StreamAnonymizationProblem_2ObjectivesPerf: "
+                                        + privacyMetricChoice);
                 }
 
                 // Execute the main query
@@ -171,4 +176,3 @@ public class StreamAnonymizationProblem_2ObjectivesPerf implements SimpleMOProbl
         };
     }
 }
-

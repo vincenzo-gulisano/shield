@@ -194,7 +194,8 @@ public class EnhancedStreamAnonymizationProblem implements
                   modifiedEvents);
           case K_ANONYMITY_CARDINALITY ->
               privacyScore = privacyMetricCalculator.apply(inputTuples, modifiedEvents);
-          default -> privacyScore = privacyMetricCalculator.apply(inputTuples, modifiedEvents);
+          default -> throw new IllegalArgumentException(
+              "Unsupported privacy metric for EnhancedStreamAnonymizationProblem: " + privacyMetricChoice);
         }
         qualities.put("privacy", privacyScore);
 

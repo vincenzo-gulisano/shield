@@ -3,6 +3,7 @@ package usecase.nhanes;
 import java.util.List;
 import java.util.Map;
 import metrics.privacy.KAnonymityPrivacyCardinality;
+import metrics.privacy.LinkageAttackPrivacy;
 import usecase.common.Tuple;
 import usecase.common.TupleMatchingScore;
 import usecase.common.TupleMatchingScore.DistanceMode;
@@ -18,6 +19,7 @@ public final class NhanesUseCaseSmokeTest {
     public static void main(String[] args) {
         printPrivacyScore();
         testF1Scores();
+        testLinkageScores();
         runMainQuery();
     }
 
@@ -31,6 +33,10 @@ public final class NhanesUseCaseSmokeTest {
                     privacyMetricCalculator.applyWithQuantile99(tuples, tuples),
                     privacyMetricCalculator.applyWithMax(tuples, tuples));
         }
+        LinkageAttackPrivacy linkageAttackPrivacy = new LinkageAttackPrivacy(tuples, 50, attributes);
+        System.out.printf("linkage@k=50: %f (expected) %f (top-k)%n",
+                linkageAttackPrivacy.applyExpectedSuccess(tuples),
+                linkageAttackPrivacy.applyTopKContainment(tuples));
     }
 
     private static void testF1Scores() {
@@ -109,5 +115,43 @@ public final class NhanesUseCaseSmokeTest {
                     "Unexpected F1 score for " + name + ": expected " + expected + ", got " + actual);
         }
         System.out.printf("f1[%s]=%f%n", name, actual);
+    }
+
+    private static void testLinkageScores() {
+        List<Tuple> original = List.of(
+                linkedTuple(0L, 0.0),
+                linkedTuple(1L, 10.0),
+                linkedTuple(2L, 20.0));
+
+        LinkageAttackPrivacy k1 = new LinkageAttackPrivacy(original, 1, List.of("f1"));
+        checkScore("linkage top-k original k=1", k1.applyTopKContainment(original), 0.0);
+        checkScore("linkage expected original k=1", k1.applyExpectedSuccess(original), 0.0);
+        checkScore("linkage top-k empty", k1.applyTopKContainment(List.of()), 1.0);
+        checkScore("linkage expected empty", k1.applyExpectedSuccess(List.of()), 1.0);
+
+        LinkageAttackPrivacy k2 = new LinkageAttackPrivacy(original, 2, List.of("f1"));
+        checkScore("linkage top-k original k=2", k2.applyTopKContainment(original), 0.0);
+        checkScore("linkage expected original k=2", k2.applyExpectedSuccess(original), 0.5);
+
+        List<Tuple> modifiedWithDuplicate = List.of(
+                linkedTuple(0L, 0.0),
+                linkedTuple(0L, 100.0),
+                linkedTuple(1L, 100.0));
+        checkScore("linkage top-k ignores duplicate ids",
+                k1.applyTopKContainment(modifiedWithDuplicate), 0.5);
+        checkScore("linkage expected ignores duplicate ids",
+                k1.applyExpectedSuccess(modifiedWithDuplicate), 0.5);
+    }
+
+    private static Tuple linkedTuple(long linkageId, double... fields) {
+        return new Tuple(0L, "", fields).withLinkageId(linkageId);
+    }
+
+    private static void checkScore(String name, double actual, double expected) {
+        if (Math.abs(actual - expected) > SCORE_TOLERANCE) {
+            throw new IllegalStateException(
+                    "Unexpected score for " + name + ": expected " + expected + ", got " + actual);
+        }
+        System.out.printf("%s=%f%n", name, actual);
     }
 }

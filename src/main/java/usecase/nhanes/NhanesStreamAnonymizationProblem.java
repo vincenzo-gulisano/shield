@@ -28,6 +28,7 @@ import java.util.function.Function;
 import mappers.QueryMapper.ArcType;
 import mappers.QueryMapper.OperatorRepresentation;
 import metrics.privacy.KAnonymityPrivacyCardinality;
+import metrics.privacy.LinkageAttackPrivacy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import problem.utils.PrivacyMetricChoice;
@@ -54,6 +55,7 @@ public class NhanesStreamAnonymizationProblem implements
   private final PrivacyMetricChoice privacyMetricChoice;
   private final QueryResult mainQueryResults;
   private final KAnonymityPrivacyCardinality privacyMetricCalculator;
+  private final LinkageAttackPrivacy linkageAttackPrivacyCalculator;
   private final double fidelityF1Threshold;
   private final double semanticsF1Threshold;
 
@@ -62,13 +64,14 @@ public class NhanesStreamAnonymizationProblem implements
   public NhanesStreamAnonymizationProblem(String inputCsvPath,
       PrivacyMetricChoice privacyMetric,
       double fidelityF1Threshold,
-      double semanticsF1Threshold) {
+      double semanticsF1Threshold,
+      int k) {
 
     logger.info(
-        "Initializing the NhanesStreamAnonymizationProblem with input CSV: {}, privacy metric: {}, fidelity F1 threshold: {}, and semantics F1 threshold: {}",
-        inputCsvPath, privacyMetric, fidelityF1Threshold, semanticsF1Threshold);
+        "Initializing the NhanesStreamAnonymizationProblem with input CSV: {}, privacy metric: {}, k: {}, fidelity F1 threshold: {}, and semantics F1 threshold: {}",
+        inputCsvPath, privacyMetric, k, fidelityF1Threshold, semanticsF1Threshold);
 
-    inputTuples = NhanesTupleLoader.load();
+    inputTuples = NhanesTupleLoader.load(inputCsvPath);
     logger.info("Loaded {} tuples from {}", inputTuples.size(), inputCsvPath);
 
     logger.info("Executing the main query to get the original results and performance metrics");
@@ -81,7 +84,8 @@ public class NhanesStreamAnonymizationProblem implements
     this.fidelityF1Threshold = fidelityF1Threshold;
     this.semanticsF1Threshold = semanticsF1Threshold;
     List<String> attributes = List.of(Tuple.getFieldNames(inputTuples.get(0).getNumFields()));
-    this.privacyMetricCalculator = new KAnonymityPrivacyCardinality(inputTuples, 50, attributes);
+    this.privacyMetricCalculator = new KAnonymityPrivacyCardinality(inputTuples, k, attributes);
+    this.linkageAttackPrivacyCalculator = new LinkageAttackPrivacy(inputTuples, k, attributes);
 
     logger.info("Empty query privacy, fidelity, and semantics scores: {}, {}, and {}",
         privacyScore(inputTuples),
@@ -100,6 +104,8 @@ public class NhanesStreamAnonymizationProblem implements
       case K_ANONYMITY_CARDINALITY_Q99 -> privacyMetricCalculator.applyWithQuantile99(inputTuples,
           modifiedEvents);
       case K_ANONYMITY_CARDINALITY -> privacyMetricCalculator.apply(inputTuples, modifiedEvents);
+      case LINKAGE_ATTACK_EXPECTED_SUCCESS -> linkageAttackPrivacyCalculator.applyExpectedSuccess(modifiedEvents);
+      case LINKAGE_ATTACK_TOP_K_CONTAINMENT -> linkageAttackPrivacyCalculator.applyTopKContainment(modifiedEvents);
     };
   }
 

@@ -35,7 +35,8 @@ ea.experiment(
         inputCsvPath = "datasets/nhanes.csv";
         privacyMetric = K_ANONYMITY_CARDINALITY_MAX;
         fidelityF1Threshold = 0.05;
-        semanticsF1Threshold = 0.2
+        semanticsF1Threshold = 0.2;
+        k = 50
       )
     )
   ];

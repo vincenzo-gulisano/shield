@@ -8,28 +8,47 @@ import metrics.privacy.DoubleFieldLookup;
 public class Tuple extends BaseRichTuple implements DoubleFieldLookup {
 
     private final double[] fs;
+    private final Long linkageId;
 
     public static String[] getFieldNames(int numFields) {
         return IntStream.rangeClosed(1, numFields).mapToObj(i -> "f" + i).toArray(String[]::new);
     }
 
     public Tuple(long stimulus, long timestamp, String key, double... fs) {
-        super(stimulus, timestamp, key);
-        this.fs = fs.clone();
+        this(stimulus, timestamp, key, null, fs);
     }
 
     public Tuple(long timestamp, String key, double... fs) {
-        super(timestamp, key);
-        this.fs = fs.clone();
+        this(0L, timestamp, key, null, fs);
     }
 
     public Tuple(long timestamp, double... fs) {
-        super(timestamp, "");
-        this.fs = fs.clone();
+        this(0L, timestamp, "", null, fs);
     }
 
     public Tuple(Tuple other) {
-        this(other.stimulus, other.timestamp, other.key, other.fs);
+        this(other.stimulus, other.timestamp, other.key, other.linkageId, other.fs);
+    }
+
+    private Tuple(long stimulus, long timestamp, String key, Long linkageId, double... fs) {
+        super(stimulus, timestamp, key);
+        this.linkageId = linkageId;
+        this.fs = fs.clone();
+    }
+
+    public Tuple withLinkageId(long linkageId) {
+        return new Tuple(stimulus, timestamp, key, linkageId, fs);
+    }
+
+    public boolean hasLinkageId() {
+        return linkageId != null;
+    }
+
+    public long getLinkageId() {
+        if (linkageId == null) {
+            throw new IllegalStateException("Tuple does not have a linkage id");
+        }
+        return linkageId;
     }
 
     public double getField(String fieldName) {

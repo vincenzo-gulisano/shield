@@ -48,12 +48,14 @@ public final class NhanesTupleLoader {
         List<Tuple> tuples = new ArrayList<>();
         try (Reader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8);
                 CSVParser parser = CSVParser.parse(reader, format)) {
+            long linkageId = 0L;
             for (CSVRecord record : parser) {
                 double[] fields = new double[COLUMNS.size()];
                 for (int i = 0; i < COLUMNS.size(); i++) {
                     fields[i] = Double.parseDouble(record.get(COLUMNS.get(i)));
                 }
-                tuples.add(new Tuple(TIMESTAMP, KEY, fields));
+                tuples.add(new Tuple(TIMESTAMP, KEY, fields).withLinkageId(linkageId));
+                linkageId++;
             }
         } catch (IOException e) {
             throw new IllegalArgumentException("Cannot read resource: " + resourcePath, e);
