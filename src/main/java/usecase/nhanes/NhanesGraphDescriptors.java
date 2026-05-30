@@ -19,6 +19,18 @@ public final class NhanesGraphDescriptors {
      *
      * <p>Bit 0: demographics ({@code f1}, {@code f2}, {@code f3}); bit 1: socioeconomic
      * ({@code f4}); bit 2: anthropometric/body ({@code f5}, {@code f6}).
+     *
+     * <p>Returned values:
+     * <ul>
+     *   <li>0 = no NHANES field categories used</li>
+     *   <li>1 = demographics</li>
+     *   <li>2 = socioeconomic</li>
+     *   <li>3 = demographics and socioeconomic</li>
+     *   <li>4 = anthropometric/body</li>
+     *   <li>5 = demographics and anthropometric/body</li>
+     *   <li>6 = socioeconomic and anthropometric/body</li>
+     *   <li>7 = demographics, socioeconomic, and anthropometric/body</li>
+     * </ul>
      */
     public static int fieldCategoryMask(Graph<OperatorRepresentation, ArcType> graph) {
         int mask = 0;
