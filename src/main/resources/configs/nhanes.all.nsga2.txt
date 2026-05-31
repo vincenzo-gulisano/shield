@@ -5,12 +5,12 @@ $imgType = svg
 $nPop = 100
 
 ea.experiment(
-  runs = (randomGenerator = (seed = [1:1:1])
+  runs = (randomGenerator = (seed = [1:1:5])
     * [m.defaultRG()])
-    * (solver = (stop = ea.sc.nOfQualityEvaluations(n = 1000))
+    * (solver = (stop = ea.sc.nOfQualityEvaluations(n = 20000))
     * [
       ea.s.nsga2(
-        nPop = 100;
+        nPop = 200;
         representation = ea.r.cfgTree(
           minTreeH = $minTreeH;
           maxTreeH = $maxTreeH;
@@ -75,7 +75,7 @@ ea.experiment(
       ]
     );
     ea.l.savePlotForRun(
-      path = $basePath + "{solver.name}/{problem.name}/{randomGenerator.seed}/" + "scatter-fidelity-vs-semantics.svg";
+      path = $basePath + "{randomGenerator.seed}." + "scatter-fidelity-vs-semantics.svg";
       plot = ea.plot.single.biObjectivePopulation(
         x = f.mapValue(key = "fidelity"; of = ea.f.quality());
         y = f.mapValue(key = "semantics"; of = ea.f.quality())
@@ -85,7 +85,7 @@ ea.experiment(
       type = svg
     );
     ea.l.savePlotForRun(
-      path = $basePath + "{solver.name}/{problem.name}/{randomGenerator.seed}/" + "scatter-privacy-vs-semantics.svg";
+      path = $basePath + "{randomGenerator.seed}." + "scatter-privacy-vs-semantics.svg";
       plot = ea.plot.single.biObjectivePopulation(
         x = f.mapValue(key = privacy; of = ea.f.quality());
         y = f.mapValue(key = "semantics"; of = ea.f.quality())
@@ -95,7 +95,7 @@ ea.experiment(
       type = svg
     );
     ea.l.savePlotForRun(
-      path = $basePath + "{solver.name}/{problem.name}/{randomGenerator.seed}/" + "scatter-fidelity-vs-privacy.svg";
+      path = $basePath + "{randomGenerator.seed}." + "scatter-fidelity-vs-privacy.svg";
       plot = ea.plot.single.biObjectivePopulation(
         x = f.mapValue(key = "fidelity"; of = ea.f.quality());
         y = f.mapValue(key = privacy; of = ea.f.quality())
