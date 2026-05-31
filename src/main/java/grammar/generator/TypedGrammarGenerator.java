@@ -28,7 +28,9 @@ public final class TypedGrammarGenerator {
     /**
      * Generation options for a typed grammar.
      *
-     * @param includeForks whether to include {@code <fork_ops_join>} as a possible operator
+     * @param includeConditionalForks whether to include typed conditional forks as possible
+     *     operators. A conditional fork routes matching tuples to the first generated branch and
+     *     non-matching tuples to the second generated branch.
      * @param minWindow minimum generated aggregate window size
      * @param maxWindow maximum generated aggregate window size
      * @param probabilities generated probability values for duplication and categorical
@@ -39,7 +41,7 @@ public final class TypedGrammarGenerator {
      *     has no explicit domain values
      */
     public record Options(
-            boolean includeForks,
+            boolean includeConditionalForks,
             int minWindow,
             int maxWindow,
             List<String> probabilities,
@@ -145,8 +147,16 @@ public final class TypedGrammarGenerator {
             operatorRules.add("<map_rir_continuous_numeric>");
             operatorRules.add("<map_aggregate_continuous_numeric>");
         }
-        if (options.includeForks()) {
-            operatorRules.add("<fork_ops_join>");
+        if (options.includeConditionalForks()) {
+            if (has(fieldsByType, FieldType.DISCRETE_NUMERIC)) {
+                operatorRules.add("<fork_discrete_numeric>");
+            }
+            if (has(fieldsByType, FieldType.CONTINUOUS_NUMERIC)) {
+                operatorRules.add("<fork_continuous_numeric>");
+            }
+            if (has(fieldsByType, FieldType.NOMINAL_CATEGORICAL)) {
+                operatorRules.add("<fork_nominal>");
+            }
         }
         return operatorRules;
     }
@@ -163,7 +173,7 @@ public final class TypedGrammarGenerator {
         }
         if (has(fieldsByType, FieldType.NOMINAL_CATEGORICAL)) {
             grammar.append("<filter_nominal> ::= ")
-                    .append(nominalFilterAlternatives(fieldsByType.get(FieldType.NOMINAL_CATEGORICAL)))
+                    .append(nominalConditionAlternatives(fieldsByType.get(FieldType.NOMINAL_CATEGORICAL), ""))
                     .append("\n");
         }
 
@@ -183,8 +193,19 @@ public final class TypedGrammarGenerator {
             grammar.append("<map_rir_continuous_numeric> ::= <continuous_numeric_attribute>\n");
             grammar.append("<map_aggregate_continuous_numeric> ::= <continuous_numeric_attribute> <numeric_agg_fun> <window_size>\n");
         }
-        if (options.includeForks()) {
-            grammar.append("<fork_ops_join> ::= <pipeline> <pipeline>\n");
+        if (options.includeConditionalForks()) {
+            if (has(fieldsByType, FieldType.DISCRETE_NUMERIC)) {
+                grammar.append("<fork_discrete_numeric> ::= <discrete_numeric_attribute> <numeric_condition> <numeric_value> <pipeline> <pipeline>\n");
+            }
+            if (has(fieldsByType, FieldType.CONTINUOUS_NUMERIC)) {
+                grammar.append("<fork_continuous_numeric> ::= <continuous_numeric_attribute> <numeric_condition> <numeric_value> <pipeline> <pipeline>\n");
+            }
+            if (has(fieldsByType, FieldType.NOMINAL_CATEGORICAL)) {
+                grammar.append("<fork_nominal> ::= ")
+                        .append(nominalConditionAlternatives(
+                                fieldsByType.get(FieldType.NOMINAL_CATEGORICAL), " <pipeline> <pipeline>"))
+                        .append("\n");
+            }
         }
     }
 
@@ -242,11 +263,11 @@ public final class TypedGrammarGenerator {
                 .append("\n");
     }
 
-    private static String nominalFilterAlternatives(List<FieldDefinition> fields) {
+    private static String nominalConditionAlternatives(List<FieldDefinition> fields, String suffix) {
         StringJoiner joiner = new StringJoiner(" | ");
         for (FieldDefinition field : fields) {
             String valueRule = field.values().isEmpty() ? "<nominal_value>" : fieldValueRule(field);
-            joiner.add(field.name() + " <nominal_condition> " + valueRule);
+            joiner.add(field.name() + " <nominal_condition> " + valueRule + suffix);
         }
         return joiner.toString();
     }
