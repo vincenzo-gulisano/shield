@@ -33,8 +33,12 @@ public final class NhanesUseCaseSmokeTest {
                     privacyMetricCalculator.applyWithQuantile99(tuples, tuples),
                     privacyMetricCalculator.applyWithMax(tuples, tuples));
         }
-        LinkageAttackPrivacy linkageAttackPrivacy = new LinkageAttackPrivacy(tuples, 50, attributes);
-        System.out.printf("linkage@k=50: %f (expected) %f (top-k)%n",
+        LinkageAttackPrivacy linkageAttackPrivacy = new LinkageAttackPrivacy(
+                tuples,
+                50,
+                NhanesStreamAnonymizationProblem.LINKAGE_ATTACK_QUASI_IDENTIFIER_ATTRIBUTES);
+        System.out.printf("linkage@k=50 quasiIds=%s: %f (expected) %f (top-k)%n",
+                NhanesStreamAnonymizationProblem.LINKAGE_ATTACK_QUASI_IDENTIFIER_ATTRIBUTES,
                 linkageAttackPrivacy.applyExpectedSuccess(tuples),
                 linkageAttackPrivacy.applyTopKContainment(tuples));
     }

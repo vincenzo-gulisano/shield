@@ -46,6 +46,8 @@ public class NhanesStreamAnonymizationProblem implements
 
   // Define a static counter for unique query ID
   private static final AtomicLong queryCounter = new AtomicLong(0);
+  static final List<String> LINKAGE_ATTACK_QUASI_IDENTIFIER_ATTRIBUTES =
+      List.of("f1", "f2", "f3", "f4");
 
   static {
     // Notify the Terminator not to end after the first query has completed
@@ -83,9 +85,13 @@ public class NhanesStreamAnonymizationProblem implements
     this.privacyMetricChoice = privacyMetric;
     this.fidelityF1Threshold = fidelityF1Threshold;
     this.semanticsF1Threshold = semanticsF1Threshold;
-    List<String> attributes = List.of(Tuple.getFieldNames(inputTuples.get(0).getNumFields()));
-    this.privacyMetricCalculator = new KAnonymityPrivacyCardinality(inputTuples, k, attributes);
-    this.linkageAttackPrivacyCalculator = new LinkageAttackPrivacy(inputTuples, k, attributes);
+    List<String> allAttributes = List.of(Tuple.getFieldNames(inputTuples.get(0).getNumFields()));
+    this.privacyMetricCalculator = usesKAnonymityMetric(privacyMetric)
+        ? new KAnonymityPrivacyCardinality(inputTuples, k, allAttributes)
+        : null;
+    this.linkageAttackPrivacyCalculator = usesLinkageAttackMetric(privacyMetric)
+        ? new LinkageAttackPrivacy(inputTuples, k, LINKAGE_ATTACK_QUASI_IDENTIFIER_ATTRIBUTES)
+        : null;
 
     logger.info("Empty query privacy, fidelity, and semantics scores: {}, {}, and {}",
         privacyScore(inputTuples),
@@ -100,12 +106,40 @@ public class NhanesStreamAnonymizationProblem implements
 
   private double privacyScore(List<Tuple> modifiedEvents) {
     return switch (privacyMetricChoice) {
-      case K_ANONYMITY_CARDINALITY_MAX -> privacyMetricCalculator.applyWithMax(inputTuples, modifiedEvents);
-      case K_ANONYMITY_CARDINALITY_Q99 -> privacyMetricCalculator.applyWithQuantile99(inputTuples,
+      case K_ANONYMITY_CARDINALITY_MAX -> requireKAnonymityCalculator().applyWithMax(inputTuples, modifiedEvents);
+      case K_ANONYMITY_CARDINALITY_Q99 -> requireKAnonymityCalculator().applyWithQuantile99(inputTuples,
           modifiedEvents);
-      case K_ANONYMITY_CARDINALITY -> privacyMetricCalculator.apply(inputTuples, modifiedEvents);
-      case LINKAGE_ATTACK_EXPECTED_SUCCESS -> linkageAttackPrivacyCalculator.applyExpectedSuccess(modifiedEvents);
-      case LINKAGE_ATTACK_TOP_K_CONTAINMENT -> linkageAttackPrivacyCalculator.applyTopKContainment(modifiedEvents);
+      case K_ANONYMITY_CARDINALITY -> requireKAnonymityCalculator().apply(inputTuples, modifiedEvents);
+      case LINKAGE_ATTACK_EXPECTED_SUCCESS -> requireLinkageAttackCalculator().applyExpectedSuccess(modifiedEvents);
+      case LINKAGE_ATTACK_TOP_K_CONTAINMENT -> requireLinkageAttackCalculator().applyTopKContainment(modifiedEvents);
+    };
+  }
+
+  private KAnonymityPrivacyCardinality requireKAnonymityCalculator() {
+    if (privacyMetricCalculator == null) {
+      throw new IllegalStateException("K-anonymity calculator is not initialized for " + privacyMetricChoice);
+    }
+    return privacyMetricCalculator;
+  }
+
+  private LinkageAttackPrivacy requireLinkageAttackCalculator() {
+    if (linkageAttackPrivacyCalculator == null) {
+      throw new IllegalStateException("Linkage attack calculator is not initialized for " + privacyMetricChoice);
+    }
+    return linkageAttackPrivacyCalculator;
+  }
+
+  private static boolean usesKAnonymityMetric(PrivacyMetricChoice privacyMetricChoice) {
+    return switch (privacyMetricChoice) {
+      case K_ANONYMITY_CARDINALITY, K_ANONYMITY_CARDINALITY_MAX, K_ANONYMITY_CARDINALITY_Q99 -> true;
+      case LINKAGE_ATTACK_EXPECTED_SUCCESS, LINKAGE_ATTACK_TOP_K_CONTAINMENT -> false;
+    };
+  }
+
+  private static boolean usesLinkageAttackMetric(PrivacyMetricChoice privacyMetricChoice) {
+    return switch (privacyMetricChoice) {
+      case LINKAGE_ATTACK_EXPECTED_SUCCESS, LINKAGE_ATTACK_TOP_K_CONTAINMENT -> true;
+      case K_ANONYMITY_CARDINALITY, K_ANONYMITY_CARDINALITY_MAX, K_ANONYMITY_CARDINALITY_Q99 -> false;
     };
   }
 
