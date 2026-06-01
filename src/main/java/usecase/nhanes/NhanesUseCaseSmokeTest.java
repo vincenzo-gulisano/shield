@@ -1,5 +1,6 @@
 package usecase.nhanes;
 
+import grammar.generator.FieldType;
 import io.github.ericmedvet.jgea.core.representation.graph.Graph;
 import io.github.ericmedvet.jgea.core.representation.tree.Tree;
 import java.io.IOException;
@@ -51,7 +52,8 @@ public final class NhanesUseCaseSmokeTest {
         LinkageAttackPrivacy linkageAttackPrivacy = new LinkageAttackPrivacy(
                 tuples,
                 50,
-                NhanesStreamAnonymizationProblem.LINKAGE_ATTACK_QUASI_IDENTIFIER_ATTRIBUTES);
+                NhanesStreamAnonymizationProblem.LINKAGE_ATTACK_QUASI_IDENTIFIER_ATTRIBUTES,
+                NhanesStreamAnonymizationProblem.LINKAGE_ATTACK_QUASI_IDENTIFIER_TYPES);
         System.out.printf("linkage@k=50 quasiIds=%s: %f (expected) %f (top-k)%n",
                 NhanesStreamAnonymizationProblem.LINKAGE_ATTACK_QUASI_IDENTIFIER_ATTRIBUTES,
                 linkageAttackPrivacy.applyExpectedSuccess(tuples),
@@ -343,6 +345,22 @@ public final class NhanesUseCaseSmokeTest {
                 k1.applyTopKContainment(modifiedWithDuplicate), 0.5);
         checkScore("linkage expected ignores duplicate ids",
                 k1.applyExpectedSuccess(modifiedWithDuplicate), 0.5);
+
+        List<Tuple> categoricalOriginal = List.of(
+                linkedTuple(0L, 1.0),
+                linkedTuple(1L, 2.0));
+        Map<String, FieldType> nominalType = Map.of("f1", FieldType.NOMINAL_CATEGORICAL);
+        LinkageAttackPrivacy categoricalK1 =
+                new LinkageAttackPrivacy(categoricalOriginal, 1, List.of("f1"), nominalType);
+        LinkageAttackPrivacy categoricalK2 =
+                new LinkageAttackPrivacy(categoricalOriginal, 2, List.of("f1"), nominalType);
+        List<Tuple> categorySwapped = List.of(linkedTuple(0L, 2.0));
+        checkScore("linkage nominal top-k swapped k=1",
+                categoricalK1.applyTopKContainment(categorySwapped), 1.0);
+        checkScore("linkage nominal top-k swapped k=2",
+                categoricalK2.applyTopKContainment(categorySwapped), 0.0);
+        checkScore("linkage nominal expected swapped k=2",
+                categoricalK2.applyExpectedSuccess(categorySwapped), 0.5);
     }
 
     private static Tuple linkedTuple(long linkageId, double... fields) {

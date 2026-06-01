@@ -16,6 +16,7 @@
 
 package usecase.nhanes;
 
+import grammar.generator.FieldType;
 import io.github.ericmedvet.jgea.core.problem.SimpleMOProblem;
 import io.github.ericmedvet.jgea.core.representation.graph.Graph;
 import java.util.Comparator;
@@ -48,6 +49,11 @@ public class NhanesStreamAnonymizationProblem implements
   private static final AtomicLong queryCounter = new AtomicLong(0);
   static final List<String> LINKAGE_ATTACK_QUASI_IDENTIFIER_ATTRIBUTES =
       List.of("f1", "f2", "f3", "f4");
+  static final Map<String, FieldType> LINKAGE_ATTACK_QUASI_IDENTIFIER_TYPES = Map.of(
+      "f1", FieldType.NOMINAL_CATEGORICAL,
+      "f2", FieldType.DISCRETE_NUMERIC,
+      "f3", FieldType.NOMINAL_CATEGORICAL,
+      "f4", FieldType.CONTINUOUS_NUMERIC);
 
   static {
     // Notify the Terminator not to end after the first query has completed
@@ -90,7 +96,8 @@ public class NhanesStreamAnonymizationProblem implements
         ? new KAnonymityPrivacyCardinality(inputTuples, k, allAttributes)
         : null;
     this.linkageAttackPrivacyCalculator = usesLinkageAttackMetric(privacyMetric)
-        ? new LinkageAttackPrivacy(inputTuples, k, LINKAGE_ATTACK_QUASI_IDENTIFIER_ATTRIBUTES)
+        ? new LinkageAttackPrivacy(
+            inputTuples, k, LINKAGE_ATTACK_QUASI_IDENTIFIER_ATTRIBUTES, LINKAGE_ATTACK_QUASI_IDENTIFIER_TYPES)
         : null;
 
     logger.info("Empty query privacy, fidelity, and semantics scores: {}, {}, and {}",

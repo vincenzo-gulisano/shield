@@ -1,9 +1,13 @@
 package metrics.privacy;
 
+import grammar.generator.FieldType;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.stream.Collectors;
 import metrics.privacy.utils.KDTree;
 import metrics.privacy.utils.MetricUtils;
@@ -22,11 +26,22 @@ public class LinkageAttackPrivacy {
 
     private final int k;
     private final List<String> attributes;
+    private final Map<String, FieldType> attributeTypes;
     private final Map<String, Double> inverseStds;
     private final Map<Long, double[]> originalVectorsByLinkageId;
+    private final List<double[]> originalVectors;
     private final KDTree originalTree;
 
     public LinkageAttackPrivacy(List<? extends Tuple> originalStream, int k, List<String> attributes) {
+        this(originalStream, k, attributes, attributes.stream()
+                .collect(Collectors.toMap(a -> a, ignored -> FieldType.CONTINUOUS_NUMERIC)));
+    }
+
+    public LinkageAttackPrivacy(
+            List<? extends Tuple> originalStream,
+            int k,
+            List<String> attributes,
+            Map<String, FieldType> attributeTypes) {
         if (originalStream == null || originalStream.isEmpty()) {
             throw new IllegalArgumentException("Original stream cannot be null or empty");
         }
@@ -35,24 +50,26 @@ public class LinkageAttackPrivacy {
         }
         this.k = k;
         this.attributes = List.copyOf(attributes);
+        this.attributeTypes = validateAttributeTypes(this.attributes, attributeTypes);
 
         Map<String, Double> means = this.attributes.stream()
                 .collect(Collectors.toMap(
                         a -> a,
-                        a -> originalStream.stream()
-                                .mapToDouble(e -> e.lookup(a))
-                                .filter(v -> !Double.isNaN(v))
-                                .average()
-                                .orElse(0.0)));
+                        a -> isNominal(a)
+                                ? 0.0
+                                : attributeValues(originalStream, a).stream()
+                                        .mapToDouble(Double::doubleValue)
+                                        .average()
+                                        .orElse(0.0)));
 
         this.inverseStds = this.attributes.stream()
                 .collect(Collectors.toMap(
                         a -> a,
                         a -> {
-                            List<Double> values = originalStream.stream()
-                                    .map(e -> e.lookup(a))
-                                    .filter(v -> !Double.isNaN(v))
-                                    .collect(Collectors.toList());
+                            if (isNominal(a)) {
+                                return 1.0;
+                            }
+                            List<Double> values = attributeValues(originalStream, a);
                             if (values.size() < 2) {
                                 return 1.0;
                             }
@@ -73,10 +90,10 @@ public class LinkageAttackPrivacy {
             originalVectorsByLinkageId.put(linkageId, toVector(tuple));
         }
 
-        List<double[]> originalVectors = originalVectorsByLinkageId.values().stream()
+        originalVectors = originalVectorsByLinkageId.values().stream()
                 .filter(v -> !MetricUtils.isAllNaN(v))
                 .collect(Collectors.toList());
-        originalTree = new KDTree(originalVectors);
+        originalTree = hasNominalAttributes() ? null : new KDTree(originalVectors);
     }
 
     /**
@@ -131,7 +148,7 @@ public class LinkageAttackPrivacy {
         if (MetricUtils.isAllNaN(modifiedVector)) {
             return 0.0;
         }
-        List<Double> nearestDistances = originalTree.findNearestDistances(modifiedVector, k);
+        List<Double> nearestDistances = findNearestDistances(modifiedVector);
         if (nearestDistances.isEmpty()) {
             return 0.0;
         }
@@ -151,9 +168,9 @@ public class LinkageAttackPrivacy {
         double[] vector = new double[attributes.size()];
         for (int i = 0; i < attributes.size(); i++) {
             String attribute = attributes.get(i);
-            double value = tuple.lookup(attribute);
+            double value = requireFinite(attribute, tuple.lookup(attribute));
             double inverseStd = inverseStds.get(attribute);
-            vector[i] = Double.isNaN(value) ? Double.NaN : value * inverseStd;
+            vector[i] = isNominal(attribute) ? value : value * inverseStd;
         }
         return vector;
     }
@@ -168,16 +185,85 @@ public class LinkageAttackPrivacy {
         return tuple.getLinkageId();
     }
 
-    private static double calculateMeanDistance(double[] a, double[] b) {
+    private List<Double> findNearestDistances(double[] modifiedVector) {
+        if (originalTree != null) {
+            return originalTree.findNearestDistances(modifiedVector, k);
+        }
+
+        PriorityQueue<Double> nearestDistances = new PriorityQueue<>(Comparator.reverseOrder());
+        for (double[] originalVector : originalVectors) {
+            double distance = calculateMeanDistance(modifiedVector, originalVector);
+            if (Double.isNaN(distance) || Double.isInfinite(distance)) {
+                continue;
+            }
+            if (nearestDistances.size() < k) {
+                nearestDistances.offer(distance);
+            } else if (distance < nearestDistances.peek()) {
+                nearestDistances.poll();
+                nearestDistances.offer(distance);
+            }
+        }
+        return new ArrayList<>(nearestDistances);
+    }
+
+    private double calculateMeanDistance(double[] a, double[] b) {
         double sum = 0.0;
         int valid = 0;
         for (int i = 0; i < a.length; i++) {
             if (!Double.isNaN(a[i]) && !Double.isNaN(b[i])) {
-                double d = a[i] - b[i];
-                sum += d * d;
+                sum += fieldDistance(i, a[i], b[i]);
                 valid++;
             }
         }
         return valid == 0 ? Double.POSITIVE_INFINITY : sum / valid;
+    }
+
+    private double fieldDistance(int attributeIndex, double a, double b) {
+        FieldType fieldType = attributeTypes.get(attributes.get(attributeIndex));
+        return switch (fieldType) {
+            case NOMINAL_CATEGORICAL -> Double.compare(a, b) == 0 ? 0.0 : 1.0;
+            case DISCRETE_NUMERIC, CONTINUOUS_NUMERIC -> {
+                double d = a - b;
+                yield d * d;
+            }
+        };
+    }
+
+    private boolean hasNominalAttributes() {
+        return attributes.stream().anyMatch(this::isNominal);
+    }
+
+    private boolean isNominal(String attribute) {
+        return attributeTypes.get(attribute) == FieldType.NOMINAL_CATEGORICAL;
+    }
+
+    private static Map<String, FieldType> validateAttributeTypes(
+            List<String> attributes,
+            Map<String, FieldType> attributeTypes) {
+        if (attributeTypes == null) {
+            throw new IllegalArgumentException("Attribute types cannot be null");
+        }
+        Map<String, FieldType> result = new LinkedHashMap<>();
+        for (String attribute : attributes) {
+            FieldType fieldType = attributeTypes.get(attribute);
+            if (fieldType == null) {
+                throw new IllegalArgumentException("Missing type for linkage attribute: " + attribute);
+            }
+            result.put(attribute, fieldType);
+        }
+        return Map.copyOf(result);
+    }
+
+    private static List<Double> attributeValues(List<? extends Tuple> tuples, String attribute) {
+        return tuples.stream()
+                .map(tuple -> requireFinite(attribute, tuple.lookup(attribute)))
+                .collect(Collectors.toList());
+    }
+
+    private static double requireFinite(String attribute, double value) {
+        if (!Double.isFinite(value)) {
+            throw new IllegalArgumentException("Attribute " + attribute + " has non-finite value: " + value);
+        }
+        return value;
     }
 }
