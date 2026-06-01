@@ -238,14 +238,24 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
   }
 
   private OperatorRepresentation parseFilterNode(Tree<String> specificOpNode, String id) {
-    String field = specificOpNode.child(0).child(0).content();
-    String condition = specificOpNode.child(1).child(0).content();
+    String field = parseTokenNode(specificOpNode.child(0));
+    String condition = parseTokenNode(specificOpNode.child(1));
     String value = parseValueNode(specificOpNode.child(2));
     if (isSampledValue(value)) {
       return new FilterOperator(id, field, condition, sampleFilterValue(value, field));
     }
 
     return new FilterOperator(id, field, condition, Double.parseDouble(value));
+  }
+
+  private static String parseTokenNode(Tree<String> node) {
+    if (node.nChildren() == 0) {
+      return node.content();
+    }
+    if (node.nChildren() == 1 && node.child(0).nChildren() == 0) {
+      return node.child(0).content();
+    }
+    throw new IllegalArgumentException("Expected terminal or unary token node, got: " + node.content());
   }
 
   private String parseValueNode(Tree<String> valueNode) {
@@ -349,8 +359,8 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
           + " must be <pipeline> nodes");
     }
 
-    String field = specificOpNode.child(0).child(0).content();
-    String condition = specificOpNode.child(1).child(0).content();
+    String field = parseTokenNode(specificOpNode.child(0));
+    String condition = parseTokenNode(specificOpNode.child(1));
     String valueToken = parseValueNode(specificOpNode.child(2));
     double value = isSampledValue(valueToken) ? sampleFilterValue(valueToken, field) : Double.parseDouble(valueToken);
 

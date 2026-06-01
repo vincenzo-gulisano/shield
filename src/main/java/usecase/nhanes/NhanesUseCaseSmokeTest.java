@@ -128,7 +128,7 @@ public final class NhanesUseCaseSmokeTest {
                 new Tuple(0L, "", 1.0, 40.0, 4.0));
         Tree<String> pipeline = pipeline(
                 tree("<filter_nominal>",
-                        tree("<nominal_attribute>", tree("f1")),
+                        tree("f1"),
                         tree("<nominal_condition>", tree("eq")),
                         tree("<f1_value>", tree("1"))),
                 tree("<filter_discrete_numeric>",
@@ -151,7 +151,7 @@ public final class NhanesUseCaseSmokeTest {
                 new Tuple(0L, "", 2.0, 30.0));
         Tree<String> pipeline = pipeline(
                 tree("<filter_nominal>",
-                        tree("<nominal_attribute>", tree("f1")),
+                        tree("f1"),
                         tree("<nominal_condition>", tree("eq")),
                         tree("<nominal_value>", tree("ucr"))));
 
@@ -199,7 +199,7 @@ public final class NhanesUseCaseSmokeTest {
                 new Tuple(0L, "", 1.0));
         Tree<String> pipeline = pipeline(
                 tree("<fork_nominal>",
-                        tree("<nominal_attribute>", tree("f1")),
+                        tree("f1"),
                         tree("<nominal_condition>", tree("eq")),
                         tree("<f1_value>", tree("1")),
                         pipeline(tree("<map_duplicate>", tree("<probability>", tree("0.0")))),
