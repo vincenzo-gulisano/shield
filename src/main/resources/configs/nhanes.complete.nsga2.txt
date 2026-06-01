@@ -5,12 +5,12 @@ $imgType = svg
 $nPop = 100
 
 ea.experiment(
-  runs = (randomGenerator = (seed = [1:1:1])
+  runs = (randomGenerator = (seed = [1:1:5])
     * [m.defaultRG()])
-    * (solver = (stop = ea.sc.nOfQualityEvaluations(n = 1000))
+    * (solver = (stop = ea.sc.nOfQualityEvaluations(n = 20000))
     * [
       ea.s.nsga2(
-        nPop = 100;
+        nPop = 200;
         representation = ea.r.cfgTree(
           minTreeH = $minTreeH;
           maxTreeH = $maxTreeH;
