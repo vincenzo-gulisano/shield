@@ -72,6 +72,9 @@ public class LiebreAnonymizationQueryFromGraph {
 
                     // }));
                 }
+                case mappers.QueryMapper.ConditionalFork f -> {
+                    operators.put(f.getID(), query.addOperator(f.createRouterOperator()));
+                }
                 case mappers.QueryMapper.Union u -> {
                     operators.put(u.getID(), query.addUnionOperator(u.getID()));
                     // operators.put(u.getID(),
@@ -114,7 +117,57 @@ public class LiebreAnonymizationQueryFromGraph {
         // HashMap<>();
         // Map<Operator<Tuple, Tuple>, List<Operator<Tuple, Tuple>>> forkTargets = new
         // HashMap<>();
+        Map<OperatorRepresentation, List<Arc<OperatorRepresentation>>> conditionalForkArcs = new LinkedHashMap<>();
         for (Arc<OperatorRepresentation> arc : g.arcs()) {
+            if (arc.source() instanceof mappers.QueryMapper.ConditionalFork) {
+                conditionalForkArcs.computeIfAbsent(arc.source(), ignored -> new ArrayList<>()).add(arc);
+                continue;
+            }
+            connectArc(query, source, sink, operators, arc);
+        }
+
+        for (Map.Entry<OperatorRepresentation, List<Arc<OperatorRepresentation>>> entry : conditionalForkArcs.entrySet()) {
+            List<Arc<OperatorRepresentation>> branchArcs = entry.getValue();
+            if (branchArcs.size() != 2) {
+                throw new IllegalArgumentException(
+                        "Conditional fork " + entry.getKey().getID() + " requires exactly two outgoing branches");
+            }
+            connectArc(query, source, sink, operators, branchArcs.get(0));
+            connectArc(query, source, sink, operators, branchArcs.get(1));
+        }
+
+        // // Connect unions to their sources
+        // for (Map.Entry<Operator<Tuple, Tuple>, List<Operator<Tuple, Tuple>>> entry :
+        // unionSources.entrySet()) {
+        // query.connect(entry.getValue(), entry.getKey());
+        // }
+
+        // // Connect forks to their targets
+        // for (Map.Entry<Operator<Tuple, Tuple>, List<Operator<Tuple, Tuple>>> entry :
+        // forkTargets.entrySet()) {
+        // query.connect(List.of(entry.getKey()), entry.getValue());
+        // }
+        query.activate();
+
+        while (sink.isEnabled()) {
+            try {
+                Thread.sleep(1);
+
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+
+        query.deActivate();
+        return collectedEvents;
+    }
+
+    private void connectArc(
+            Query query,
+            Source<Tuple> source,
+            Sink<Tuple> sink,
+            Map<String, Operator<Tuple, Tuple>> operators,
+            Arc<OperatorRepresentation> arc) {
 
             // If the source id is the actual source, then it is safe to connected it to the
             // target operator immediately
@@ -159,32 +212,6 @@ public class LiebreAnonymizationQueryFromGraph {
             else {
                 query.connect(operators.get(arc.source().getID()), operators.get(arc.target().getID()));
             }
-        }
-
-        // // Connect unions to their sources
-        // for (Map.Entry<Operator<Tuple, Tuple>, List<Operator<Tuple, Tuple>>> entry :
-        // unionSources.entrySet()) {
-        // query.connect(entry.getValue(), entry.getKey());
-        // }
-
-        // // Connect forks to their targets
-        // for (Map.Entry<Operator<Tuple, Tuple>, List<Operator<Tuple, Tuple>>> entry :
-        // forkTargets.entrySet()) {
-        // query.connect(List.of(entry.getKey()), entry.getValue());
-        // }
-        query.activate();
-
-        while (sink.isEnabled()) {
-            try {
-                Thread.sleep(1);
-
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
-
-        query.deActivate();
-        return collectedEvents;
     }
 
 }

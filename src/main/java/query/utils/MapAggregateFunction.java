@@ -7,9 +7,11 @@ import usecase.common.Tuple;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
+import static query.utils.OperatorUtils.requireFinite;
+
 /**
  * A stateful MapFunction that replaces an attribute's value with a moving average
- * The average is calculated over the last N valid (non-NaN) values encountered in the stream
+ * The average is calculated over the last N finite values encountered in the stream
  *
  * This class is stateful and maintains an internal buffer of recent values
  */
@@ -35,12 +37,7 @@ public class MapAggregateFunction implements MapFunction<Tuple, Tuple> {
         }
 
         // Extract the value of the target attribute from the current event
-        double val = in.lookup(field);
-
-        // If the current value is NaN, do not update the window or apply a new value
-        if (Double.isNaN(val)) {
-            return new Tuple(in);
-        }
+        double val = requireFinite(field, in.lookup(field));
 
         // Add the new valid value to the end of the window buffer
         windowBuffer.addLast(val);

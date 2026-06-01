@@ -36,6 +36,13 @@ public class OperatorUtils {
         return event.getAttribute(attributeName);
     }
 
+    public static double requireFinite(String field, double value) {
+        if (!Double.isFinite(value)) {
+            throw new IllegalArgumentException("Field " + field + " has non-finite value: " + value);
+        }
+        return value;
+    }
+
     // Helper method that sets the value of a specified attribute
     public static void setAttributeValue(GenericEvent event, String attributeToSet, double newValue) {
         if (event == null) return;

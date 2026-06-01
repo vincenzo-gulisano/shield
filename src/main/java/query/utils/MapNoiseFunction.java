@@ -14,10 +14,12 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 
+import static query.utils.OperatorUtils.requireFinite;
+
 /**
  * A stateful MapFunction that replaces an attribute's value with a moving
  * average
- * The average is calculated over the last N valid (non-NaN) values encountered
+ * The average is calculated over the last N finite values encountered
  * in the stream
  *
  * This class is stateful and maintains an internal buffer of recent values
@@ -44,9 +46,7 @@ public class MapNoiseFunction implements MapFunction<Tuple, Tuple> {
     public Tuple apply(Tuple in) {
         if (in == null)
             return null;
-        double v = in.lookup(field);
-        if (Double.isNaN(v))
-            return in;
+        double v = requireFinite(field, in.lookup(field));
         Tuple out = new Tuple(in);
         out.set(field, v + random.nextGaussian() * percentage * Math.abs(v));
         return out;

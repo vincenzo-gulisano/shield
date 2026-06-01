@@ -11,10 +11,12 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Random;
 
+import static query.utils.OperatorUtils.requireFinite;
+
 /**
  * A stateful MapFunction that replaces an attribute's value with a moving
  * average
- * The average is calculated over the last N valid (non-NaN) values encountered
+ * The average is calculated over the last N finite values encountered
  * in the stream
  *
  * This class is stateful and maintains an internal buffer of recent values
@@ -45,12 +47,7 @@ public class RIRMap implements MapFunction<Tuple, Tuple> {
         }
 
         // Extract the value of the target attribute from the current event
-        double currentValue = in.lookup(field);
-
-        // If the current value is NaN, do not update the window or apply a new value
-        if (Double.isNaN(currentValue)) {
-            return in;
-        }
+        double currentValue = requireFinite(field, in.lookup(field));
 
         // Update the min and max values
         if (currentValue < min) {

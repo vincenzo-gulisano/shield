@@ -43,7 +43,7 @@ public class Functions {
    * bit 2 = MapNoise
    * bit 3 = MapRIR
    * bit 4 = MapAggregate
-   * bit 5 = Fork
+   * bit 5 = Fork or ConditionalFork
    *
    * Source, Sink, and Union are structural nodes and do not contribute to the bitmap.
    *
@@ -134,7 +134,7 @@ public class Functions {
     Function<Graph<N, A>, Integer> f = g -> {
       int count = 0;
       for (N node : g.nodes()) {
-        if (node instanceof QueryMapper.Fork) {
+        if (node instanceof QueryMapper.Fork || node instanceof QueryMapper.ConditionalFork) {
           count++;
         }
       }
@@ -192,7 +192,7 @@ public class Functions {
     if (node instanceof QueryMapper.MapAggregate) {
       return 1 << 4;
     }
-    if (node instanceof QueryMapper.Fork) {
+    if (node instanceof QueryMapper.Fork || node instanceof QueryMapper.ConditionalFork) {
       return 1 << 5;
     }
     return 0;

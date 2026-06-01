@@ -32,16 +32,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import component.operator.in1.filter.FilterFunction;
-import component.operator.in1.filter.FilterOperator;
 import component.operator.in1.map.FlatMapFunction;
+import component.operator.in1.map.MapFunction;
 import mappers.QueryMapper.ArcType;
 import mappers.QueryMapper.OperatorRepresentation;
+import query.utils.CategoricalNoiseFunction;
+import query.utils.CategoricalRIRMap;
+import query.utils.ConditionalTupleRouterOperator;
+import query.utils.DiscreteNumericNoiseFunction;
+import query.utils.DiscreteNumericRIRMap;
 import query.utils.MapAggregateFunction;
 import query.utils.MapDuplicateFunction;
 import query.utils.MapNoiseFunction;
 import query.utils.RIRMap;
 import usecase.common.FieldValueSampler;
 import usecase.common.Tuple;
+
+import static query.utils.OperatorUtils.requireFinite;
 
 public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<OperatorRepresentation, ArcType>> {
 
@@ -90,7 +97,6 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
 
   private OperatorRepresentation parsePipelineNode(Tree<String> pipelineNode, OperatorRepresentation previousNode,
       Graph<OperatorRepresentation, ArcType> g, Map<String, Integer> operatorCounters) {
-
     if (previousNode == null) {
       throw new IllegalArgumentException("Previous node cannot be null when parsing a <pipeline> node");
     }
@@ -134,7 +140,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     Tree<String> specificOpNode = operatorNode.child(0);
 
     switch (specificOpNode.content()) {
-      case "<filter>" -> {
+      case "<filter>", "<filter_discrete_numeric>", "<filter_continuous_numeric>", "<filter_nominal>" -> {
         String id = "F" + operatorCounters.merge("Filter", 1, Integer::sum);
         return addSimpleOperatorStepToGraph(
             parseFilterNode(specificOpNode, id),
@@ -149,16 +155,52 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
       case "<map_noise>" -> {
         String id = "MN" + operatorCounters.merge("MapNoise", 1, Integer::sum);
         return addSimpleOperatorStepToGraph(
-            parseMapNoiseNode(specificOpNode, id),
+            parseMapNoiseNode(specificOpNode, id, FieldSemanticType.CONTINUOUS_NUMERIC),
+            previousNode, g);
+      }
+      case "<map_noise_continuous_numeric>" -> {
+        String id = "MN" + operatorCounters.merge("MapNoise", 1, Integer::sum);
+        return addSimpleOperatorStepToGraph(
+            parseMapNoiseNode(specificOpNode, id, FieldSemanticType.CONTINUOUS_NUMERIC),
+            previousNode, g);
+      }
+      case "<map_noise_discrete_numeric>" -> {
+        String id = "MN" + operatorCounters.merge("MapNoise", 1, Integer::sum);
+        return addSimpleOperatorStepToGraph(
+            parseMapNoiseNode(specificOpNode, id, FieldSemanticType.DISCRETE_NUMERIC),
+            previousNode, g);
+      }
+      case "<map_noise_nominal>" -> {
+        String id = "MN" + operatorCounters.merge("MapNoise", 1, Integer::sum);
+        return addSimpleOperatorStepToGraph(
+            parseMapNoiseNode(specificOpNode, id, FieldSemanticType.NOMINAL_CATEGORICAL),
             previousNode, g);
       }
       case "<map_rir>" -> {
         String id = "MR" + operatorCounters.merge("MapRIR", 1, Integer::sum);
         return addSimpleOperatorStepToGraph(
-            parseMapRIRNode(specificOpNode, id),
+            parseMapRIRNode(specificOpNode, id, FieldSemanticType.CONTINUOUS_NUMERIC),
             previousNode, g);
       }
-      case "<map_aggregate>" -> {
+      case "<map_rir_continuous_numeric>" -> {
+        String id = "MR" + operatorCounters.merge("MapRIR", 1, Integer::sum);
+        return addSimpleOperatorStepToGraph(
+            parseMapRIRNode(specificOpNode, id, FieldSemanticType.CONTINUOUS_NUMERIC),
+            previousNode, g);
+      }
+      case "<map_rir_discrete_numeric>" -> {
+        String id = "MR" + operatorCounters.merge("MapRIR", 1, Integer::sum);
+        return addSimpleOperatorStepToGraph(
+            parseMapRIRNode(specificOpNode, id, FieldSemanticType.DISCRETE_NUMERIC),
+            previousNode, g);
+      }
+      case "<map_rir_nominal>" -> {
+        String id = "MR" + operatorCounters.merge("MapRIR", 1, Integer::sum);
+        return addSimpleOperatorStepToGraph(
+            parseMapRIRNode(specificOpNode, id, FieldSemanticType.NOMINAL_CATEGORICAL),
+            previousNode, g);
+      }
+      case "<map_aggregate>", "<map_aggregate_discrete_numeric>", "<map_aggregate_continuous_numeric>" -> {
         String id = "MA" + operatorCounters.merge("MapAggregate", 1, Integer::sum);
         return addSimpleOperatorStepToGraph(
             parseMapAggregateNode(specificOpNode, id),
@@ -166,6 +208,9 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
       }
       case "<fork_ops_join>" -> {
         return parseForkJoinNode(specificOpNode, previousNode, g, operatorCounters);
+      }
+      case "<fork_discrete_numeric>", "<fork_continuous_numeric>", "<fork_nominal>" -> {
+        return parseConditionalForkJoinNode(specificOpNode, previousNode, g, operatorCounters);
       }
       default ->
         throw new IllegalArgumentException("Unknown operator type found in grammar tree: " + specificOpNode.content());
@@ -193,18 +238,9 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
   }
 
   private OperatorRepresentation parseFilterNode(Tree<String> specificOpNode, String id) {
-    StringBuilder valueStringBuilder = new StringBuilder();
-    specificOpNode.child(2).childStream().forEach(c -> {
-      if (c.nChildren() == 0) {
-        valueStringBuilder.append(c.content());
-      } else {
-        valueStringBuilder.append(c.child(0).content());
-      }
-    }); // value attribute
-
     String field = specificOpNode.child(0).child(0).content();
     String condition = specificOpNode.child(1).child(0).content();
-    String value = valueStringBuilder.toString();
+    String value = parseValueNode(specificOpNode.child(2));
     if (isSampledValue(value)) {
       return new FilterOperator(id, field, condition, sampleFilterValue(value, field));
     }
@@ -212,10 +248,25 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     return new FilterOperator(id, field, condition, Double.parseDouble(value));
   }
 
+  private String parseValueNode(Tree<String> valueNode) {
+    if (valueNode.nChildren() == 0) {
+      return valueNode.content();
+    }
+    StringBuilder valueStringBuilder = new StringBuilder();
+    valueNode.childStream().forEach(c -> {
+      if (c.nChildren() == 0) {
+        valueStringBuilder.append(c.content());
+      } else {
+        valueStringBuilder.append(c.child(0).content());
+      }
+    }); // value attribute
+    return valueStringBuilder.toString();
+  }
+
   private double sampleFilterValue(String value, String field) {
     if (fieldValueSampler == null) {
       throw new IllegalStateException(
-          "Filter value '" + value + "' requires a FieldValueSampler configured on QueryMapper");
+          "Value token '" + value + "' requires a FieldValueSampler configured on QueryMapper");
     }
     return switch (value) {
       case URIR -> fieldValueSampler.urir(field);
@@ -234,14 +285,14 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     return new MapDuplicate(id, Double.parseDouble(specificOpNode.child(0).child(0).content()));
   }
 
-  private OperatorRepresentation parseMapNoiseNode(Tree<String> specificOpNode, String id) {
+  private OperatorRepresentation parseMapNoiseNode(Tree<String> specificOpNode, String id, FieldSemanticType fieldType) {
     return new MapNoise(id, specificOpNode.child(0).child(0).content(),
-        Double.parseDouble(specificOpNode.child(1).child(0).content()));
+        Double.parseDouble(specificOpNode.child(1).child(0).content()), fieldType);
 
   }
 
-  private OperatorRepresentation parseMapRIRNode(Tree<String> specificOpNode, String id) {
-    return new MapRIR(id, specificOpNode.child(0).child(0).content());
+  private OperatorRepresentation parseMapRIRNode(Tree<String> specificOpNode, String id, FieldSemanticType fieldType) {
+    return new MapRIR(id, specificOpNode.child(0).child(0).content(), fieldType);
   }
 
   private OperatorRepresentation parseMapAggregateNode(Tree<String> specificOpNode, String id) {
@@ -285,6 +336,41 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
 
   }
 
+  private OperatorRepresentation parseConditionalForkJoinNode(Tree<String> specificOpNode,
+      OperatorRepresentation previousNode, Graph<OperatorRepresentation, ArcType> g,
+      Map<String, Integer> operatorCounters) {
+    if (specificOpNode.nChildren() != 5) {
+      throw new IllegalArgumentException(
+          specificOpNode.content() + " must have a field, condition, value, and two <pipeline> children");
+    }
+    if (!specificOpNode.child(3).content().equals("<pipeline>")
+        || !specificOpNode.child(4).content().equals("<pipeline>")) {
+      throw new IllegalArgumentException("The last two children of " + specificOpNode.content()
+          + " must be <pipeline> nodes");
+    }
+
+    String field = specificOpNode.child(0).child(0).content();
+    String condition = specificOpNode.child(1).child(0).content();
+    String valueToken = parseValueNode(specificOpNode.child(2));
+    double value = isSampledValue(valueToken) ? sampleFilterValue(valueToken, field) : Double.parseDouble(valueToken);
+
+    String forkId = "CFK" + operatorCounters.merge("ConditionalFork", 1, Integer::sum);
+    OperatorRepresentation forkOp = new ConditionalFork(forkId, field, condition, value);
+    g.addNode(forkOp);
+    g.setArcValue(previousNode, forkOp, ArcType.DEFAULT_ARC);
+
+    OperatorRepresentation leftBranch = parsePipelineNode(specificOpNode.child(3), forkOp, g, operatorCounters);
+    OperatorRepresentation rightBranch = parsePipelineNode(specificOpNode.child(4), forkOp, g, operatorCounters);
+
+    String unionId = "U" + operatorCounters.merge("Union", 1, Integer::sum);
+    OperatorRepresentation joinOp = new Union(unionId);
+    g.addNode(joinOp);
+    g.setArcValue(leftBranch, joinOp, ArcType.DEFAULT_ARC);
+    g.setArcValue(rightBranch, joinOp, ArcType.DEFAULT_ARC);
+
+    return joinOp;
+  }
+
   public enum ArcType {
     DEFAULT_ARC
   }
@@ -306,12 +392,17 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
 
     if (isOperatorNode(content)) {
       sb.append("\t".repeat(level)).append(operatorName(content)).append('\n');
-      if (content.equals("<fork_ops_join>")) {
+      if (content.equals("<fork_ops_join>") || content.startsWith("<fork_")) {
+        int printedPipelines = 0;
         for (int i = 0; i < node.nChildren(); i++) {
-          if (i > 0) {
+          if (!node.child(i).content().equals("<pipeline>")) {
+            continue;
+          }
+          if (printedPipelines > 0) {
             sb.append('\n');
           }
           appendTreeOperators(sb, node.child(i), level + 1);
+          printedPipelines++;
         }
       }
     }
@@ -319,7 +410,12 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
 
   private static boolean isOperatorNode(String content) {
     return switch (content) {
-      case "<filter>", "<map_duplicate>", "<map_noise>", "<map_rir>", "<map_aggregate>", "<fork_ops_join>" -> true;
+      case "<filter>", "<filter_discrete_numeric>", "<filter_continuous_numeric>", "<filter_nominal>",
+          "<map_duplicate>", "<map_noise>", "<map_noise_nominal>", "<map_noise_discrete_numeric>",
+          "<map_noise_continuous_numeric>", "<map_rir>", "<map_rir_nominal>", "<map_rir_discrete_numeric>",
+          "<map_rir_continuous_numeric>", "<map_aggregate>", "<map_aggregate_discrete_numeric>",
+          "<map_aggregate_continuous_numeric>", "<fork_ops_join>", "<fork_discrete_numeric>",
+          "<fork_continuous_numeric>", "<fork_nominal>" -> true;
       default -> false;
     };
   }
@@ -350,6 +446,9 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     if (node instanceof QueryMapper.MapAggregate mapAggregate) {
       return mapAggregate.field();
     }
+    if (node instanceof QueryMapper.ConditionalFork conditionalFork) {
+      return conditionalFork.field();
+    }
     return null;
   }
 
@@ -371,6 +470,12 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     MAX
   }
 
+  public enum FieldSemanticType {
+    CONTINUOUS_NUMERIC,
+    DISCRETE_NUMERIC,
+    NOMINAL_CATEGORICAL
+  }
+
   private static long deterministicSeed(Object... parts) {
     long seed = 1125899906842597L;
     for (Object part : parts) {
@@ -380,7 +485,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
   }
 
   public sealed interface OperatorRepresentation
-      permits FilterOperator, MapDuplicate, MapNoise, MapRIR, MapAggregate, Fork, Union, Source, Sink {
+      permits FilterOperator, MapDuplicate, MapNoise, MapRIR, MapAggregate, Fork, ConditionalFork, Union, Source, Sink {
     public String getID();
   }
 
@@ -392,15 +497,19 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     }
 
     public FilterFunction<Tuple> createFilterFunction() {
-      switch (condition) {
-        case "lt":
-          return t -> t.lookup(field) < value;
-        case "gt":
-          return t -> t.lookup(field) > value;
-        default:
-          throw new IllegalArgumentException("Unkown condition " + condition + " for filter " + getID());
-      }
+      return createTupleCondition(field, condition, value);
     }
+  }
+
+  private static FilterFunction<Tuple> createTupleCondition(String field, String condition, double value) {
+    double conditionValue = requireFinite(field, value);
+    return switch (condition) {
+      case "lt" -> t -> requireFinite(field, t.lookup(field)) < conditionValue;
+      case "gt" -> t -> requireFinite(field, t.lookup(field)) > conditionValue;
+      case "eq" -> t -> Double.compare(requireFinite(field, t.lookup(field)), conditionValue) == 0;
+      case "neq" -> t -> Double.compare(requireFinite(field, t.lookup(field)), conditionValue) != 0;
+      default -> throw new IllegalArgumentException("Unknown condition " + condition);
+    };
   }
 
   public record MapDuplicate(String id, double probability) implements OperatorRepresentation {
@@ -414,25 +523,44 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     }
   }
 
-  public record MapNoise(String id, String field, double probability) implements OperatorRepresentation {
+  public record MapNoise(String id, String field, double probability, FieldSemanticType fieldType)
+      implements OperatorRepresentation {
+    public MapNoise(String id, String field, double probability) {
+      this(id, field, probability, FieldSemanticType.CONTINUOUS_NUMERIC);
+    }
+
     @Override
     public String getID() {
       return id;
     }
 
-    public MapNoiseFunction createMapFunction() {
-      return new MapNoiseFunction(field, probability, deterministicSeed("MapNoise", id, field, probability));
+    public MapFunction<Tuple, Tuple> createMapFunction() {
+      long seed = deterministicSeed("MapNoise", id, field, probability, fieldType);
+      return switch (fieldType) {
+        case CONTINUOUS_NUMERIC -> new MapNoiseFunction(field, probability, seed);
+        case DISCRETE_NUMERIC -> new DiscreteNumericNoiseFunction(field, probability, seed);
+        case NOMINAL_CATEGORICAL -> new CategoricalNoiseFunction(field, probability, seed);
+      };
     }
   }
 
-  public record MapRIR(String id, String field) implements OperatorRepresentation {
+  public record MapRIR(String id, String field, FieldSemanticType fieldType) implements OperatorRepresentation {
+    public MapRIR(String id, String field) {
+      this(id, field, FieldSemanticType.CONTINUOUS_NUMERIC);
+    }
+
     @Override
     public String getID() {
       return id;
     }
 
-    public RIRMap createRIRMap() {
-      return new RIRMap(field, deterministicSeed("MapRIR", id, field));
+    public MapFunction<Tuple, Tuple> createRIRMap() {
+      long seed = deterministicSeed("MapRIR", id, field, fieldType);
+      return switch (fieldType) {
+        case CONTINUOUS_NUMERIC -> new RIRMap(field, seed);
+        case DISCRETE_NUMERIC -> new DiscreteNumericRIRMap(field, seed);
+        case NOMINAL_CATEGORICAL -> new CategoricalRIRMap(field, seed);
+      };
     }
   }
 
@@ -452,6 +580,18 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     @Override
     public String getID() {
       return id;
+    }
+  }
+
+  public record ConditionalFork(String id, String field, String condition, double value)
+      implements OperatorRepresentation {
+    @Override
+    public String getID() {
+      return id;
+    }
+
+    public ConditionalTupleRouterOperator createRouterOperator() {
+      return new ConditionalTupleRouterOperator(id, createTupleCondition(field, condition, value));
     }
   }
 
@@ -534,6 +674,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
       case "MapRIR" -> parseMapRIRFromString(representation);
       case "MapAggregate" -> parseMapAggregateFromString(representation);
       case "Fork" -> parseForkFromString(representation);
+      case "ConditionalFork" -> parseConditionalForkFromString(representation);
       case "Union" -> parseUnionFromString(representation);
       case "Source" -> parseSourceFromString(representation);
       case "Sink" -> parseSinkFromString(representation);
@@ -562,14 +703,16 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     return new MapNoise(
         requiredParam(params, "id", representation),
         requiredParam(params, "field", representation),
-        Double.parseDouble(requiredParam(params, "probability", representation)));
+        Double.parseDouble(requiredParam(params, "probability", representation)),
+        optionalFieldSemanticType(params, representation));
   }
 
   public static MapRIR parseMapRIRFromString(String representation) {
     Map<String, String> params = parseOperatorParams(representation, "MapRIR");
     return new MapRIR(
         requiredParam(params, "id", representation),
-        requiredParam(params, "field", representation));
+        requiredParam(params, "field", representation),
+        optionalFieldSemanticType(params, representation));
   }
 
   public static MapAggregate parseMapAggregateFromString(String representation) {
@@ -583,6 +726,15 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
 
   public static Fork parseForkFromString(String representation) {
     return new Fork(requiredParam(parseOperatorParams(representation, "Fork"), "id", representation));
+  }
+
+  public static ConditionalFork parseConditionalForkFromString(String representation) {
+    Map<String, String> params = parseOperatorParams(representation, "ConditionalFork");
+    return new ConditionalFork(
+        requiredParam(params, "id", representation),
+        requiredParam(params, "field", representation),
+        requiredParam(params, "condition", representation),
+        Double.parseDouble(requiredParam(params, "value", representation)));
   }
 
   public static Union parseUnionFromString(String representation) {
@@ -652,6 +804,18 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
       throw new IllegalArgumentException("Missing parameter '" + name + "' in: " + representation);
     }
     return value;
+  }
+
+  private static FieldSemanticType optionalFieldSemanticType(Map<String, String> params, String representation) {
+    String value = params.get("fieldType");
+    if (value == null) {
+      return FieldSemanticType.CONTINUOUS_NUMERIC;
+    }
+    try {
+      return FieldSemanticType.valueOf(value);
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException("Unknown fieldType '" + value + "' in: " + representation, e);
+    }
   }
 
 }

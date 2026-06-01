@@ -25,7 +25,7 @@ public final class TupleFieldValueSampler implements FieldValueSampler {
     /**
      * Build a sampler using the default random seed.
      *
-     * <p>The sampler scans all tuple fields named {@code f1..fN}, keeps only finite values, and
+     * <p>The sampler scans all tuple fields named {@code f1..fN}, requires finite values, and
      * precomputes the range, empirical values, and unique category values used by
      * {@link #urir(String)}, {@link #drir(String)}, {@link #ucr(String)}, and {@link #dcr(String)}.
      */
@@ -111,7 +111,7 @@ public final class TupleFieldValueSampler implements FieldValueSampler {
         }
 
         int numFields = tuples.get(0).getNumFields();
-        // Keep raw finite values by field so drir preserves empirical frequencies.
+        // Keep raw values by field so drir preserves empirical frequencies.
         List<List<Double>> valuesByIndex = new ArrayList<>(numFields);
         for (int i = 0; i < numFields; i++) {
             valuesByIndex.add(new ArrayList<>());
@@ -123,10 +123,12 @@ public final class TupleFieldValueSampler implements FieldValueSampler {
                         "Expected " + numFields + " fields, found " + tuple.getNumFields());
             }
             for (int i = 0; i < numFields; i++) {
-                double value = tuple.getField("f" + (i + 1));
-                if (Double.isFinite(value)) {
-                    valuesByIndex.get(i).add(value);
+                String field = "f" + (i + 1);
+                double value = tuple.getField(field);
+                if (!Double.isFinite(value)) {
+                    throw new IllegalArgumentException("Field " + field + " has non-finite value: " + value);
                 }
+                valuesByIndex.get(i).add(value);
             }
         }
 
