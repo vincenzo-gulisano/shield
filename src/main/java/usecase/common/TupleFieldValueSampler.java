@@ -2,15 +2,18 @@ package usecase.common;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 
 /**
  * Field-value sampler backed by the finite values found in a set of tuples.
  *
  * <p>Sampling is stateful/random and is not guaranteed deterministic across calls. Even when a seed
- * is supplied, results depend on call order.
+ * is supplied, results depend on call order. Numeric range sampling and categorical sampling use
+ * the same random sequence.
  */
 public final class TupleFieldValueSampler implements FieldValueSampler {
 
@@ -23,8 +26,8 @@ public final class TupleFieldValueSampler implements FieldValueSampler {
      * Build a sampler using the default random seed.
      *
      * <p>The sampler scans all tuple fields named {@code f1..fN}, keeps only finite values, and
-     * precomputes the range and empirical values used by {@link #urir(String)} and
-     * {@link #drir(String)}.
+     * precomputes the range, empirical values, and unique category values used by
+     * {@link #urir(String)}, {@link #drir(String)}, {@link #ucr(String)}, and {@link #dcr(String)}.
      */
     public TupleFieldValueSampler(List<? extends Tuple> tuples) {
         this(tuples, DEFAULT_RANDOM_SEED);
@@ -69,6 +72,29 @@ public final class TupleFieldValueSampler implements FieldValueSampler {
     public double drir(String field) {
         FieldValues values = valuesFor(field);
         return values.values().get(random.nextInt(values.values().size()));
+    }
+
+    /**
+     * Sample uniformly from the unique observed categories of {@code field}.
+     *
+     * <p>Each distinct finite value observed in the field has equal probability, regardless of how
+     * often that value appeared in the input tuples.
+     */
+    @Override
+    public double ucr(String field) {
+        FieldValues values = valuesFor(field);
+        return values.uniqueValues().get(random.nextInt(values.uniqueValues().size()));
+    }
+
+    /**
+     * Sample from the empirical categorical distribution of {@code field}.
+     *
+     * <p>This currently has the same sampling mechanics as {@link #drir(String)}: each observed
+     * tuple value has equal probability, so repeated categories naturally have more weight.
+     */
+    @Override
+    public double dcr(String field) {
+        return drir(field);
     }
 
     private FieldValues valuesFor(String field) {
@@ -116,15 +142,17 @@ public final class TupleFieldValueSampler implements FieldValueSampler {
         return Map.copyOf(result);
     }
 
-    private record FieldValues(List<Double> values, double min, double max) {
+    private record FieldValues(List<Double> values, List<Double> uniqueValues, double min, double max) {
         private static FieldValues from(List<Double> values) {
             double min = Double.POSITIVE_INFINITY;
             double max = Double.NEGATIVE_INFINITY;
+            Set<Double> uniqueValues = new LinkedHashSet<>();
             for (double value : values) {
                 min = Math.min(min, value);
                 max = Math.max(max, value);
+                uniqueValues.add(value);
             }
-            return new FieldValues(List.copyOf(values), min, max);
+            return new FieldValues(List.copyOf(values), List.copyOf(uniqueValues), min, max);
         }
     }
 }

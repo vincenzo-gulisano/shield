@@ -16,4 +16,14 @@ public interface FieldValueSampler {
      * Distribution-based random in range for the given field.
      */
     double drir(String field);
+
+    /**
+     * Uniform categorical random for the given field.
+     */
+    double ucr(String field);
+
+    /**
+     * Distribution-based categorical random for the given field.
+     */
+    double dcr(String field);
 }

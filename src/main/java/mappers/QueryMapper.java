@@ -48,6 +48,8 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
   private static final Logger logger = LoggerFactory.getLogger(QueryMapper.class);
   private static final String URIR = "urir";
   private static final String DRIR = "drir";
+  private static final String UCR = "ucr";
+  private static final String DCR = "dcr";
 
   private final FieldValueSampler fieldValueSampler;
 
@@ -203,7 +205,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     String field = specificOpNode.child(0).child(0).content();
     String condition = specificOpNode.child(1).child(0).content();
     String value = valueStringBuilder.toString();
-    if (value.equals(URIR) || value.equals(DRIR)) {
+    if (isSampledValue(value)) {
       return new FilterOperator(id, field, condition, sampleFilterValue(value, field));
     }
 
@@ -218,8 +220,14 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     return switch (value) {
       case URIR -> fieldValueSampler.urir(field);
       case DRIR -> fieldValueSampler.drir(field);
+      case UCR -> fieldValueSampler.ucr(field);
+      case DCR -> fieldValueSampler.dcr(field);
       default -> throw new IllegalArgumentException("Unknown sampled filter value: " + value);
     };
+  }
+
+  private static boolean isSampledValue(String value) {
+    return value.equals(URIR) || value.equals(DRIR) || value.equals(UCR) || value.equals(DCR);
   }
 
   private OperatorRepresentation parseMapDuplicateNode(Tree<String> specificOpNode, String id) {
