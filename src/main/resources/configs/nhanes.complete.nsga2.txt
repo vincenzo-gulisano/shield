@@ -15,7 +15,7 @@ ea.experiment(
           minTreeH = $minTreeH;
           maxTreeH = $maxTreeH;
           grammar = ea.grammar.fromFile(
-            path = "src/main/resources/grammars/nhanes/nhanes.allbutforks.bnf"));
+            path = "src/main/resources/grammars/nhanes/nhanes.complete.bnf"));
         mapper = anonym.mapper.queryMapperWithSampler(
           fieldValueSampler = anonym.valueSampler.nhanesTupleFieldValueSampler(
             inputCsvPath = "datasets/nhanes.csv";
@@ -31,7 +31,7 @@ ea.experiment(
         privacyMetric = LINKAGE_ATTACK_TOP_K_CONTAINMENT;
         fidelityF1Threshold = 0.05;
         semanticsF1Threshold = 0.05;
-        k = 3
+        k = 10
       )
     )
   ];

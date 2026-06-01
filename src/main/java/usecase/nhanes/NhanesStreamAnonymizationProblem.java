@@ -48,12 +48,11 @@ public class NhanesStreamAnonymizationProblem implements
   // Define a static counter for unique query ID
   private static final AtomicLong queryCounter = new AtomicLong(0);
   static final List<String> LINKAGE_ATTACK_QUASI_IDENTIFIER_ATTRIBUTES =
-      List.of("f1", "f2", "f3", "f4");
+      List.of("f1", "f2", "f3");
   static final Map<String, FieldType> LINKAGE_ATTACK_QUASI_IDENTIFIER_TYPES = Map.of(
       "f1", FieldType.NOMINAL_CATEGORICAL,
       "f2", FieldType.DISCRETE_NUMERIC,
-      "f3", FieldType.NOMINAL_CATEGORICAL,
-      "f4", FieldType.CONTINUOUS_NUMERIC);
+      "f3", FieldType.NOMINAL_CATEGORICAL);
 
   static {
     // Notify the Terminator not to end after the first query has completed
