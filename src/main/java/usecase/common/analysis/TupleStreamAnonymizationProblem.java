@@ -132,6 +132,7 @@ public class TupleStreamAnonymizationProblem implements
                 }
                 long startTime = debugEnabled ? System.currentTimeMillis() : 0L;
                 List<Tuple> modifiedEvents = liebreExecutor.processAnonymizationQuery(graph, inputTuples);
+                modifiedEvents = sortedByTimestampAndKey(modifiedEvents);
                 if (debugEnabled) {
                     logger.debug(
                             "Finished {} anonymization query #{}, input tuples: {}, output tuples: {}, total time: {}s",
@@ -235,5 +236,13 @@ public class TupleStreamAnonymizationProblem implements
         }
         return attributes.stream()
                 .collect(Collectors.toMap(a -> a, ignored -> FieldType.CONTINUOUS_NUMERIC));
+    }
+
+    private static List<Tuple> sortedByTimestampAndKey(List<Tuple> tuples) {
+        return tuples.stream()
+                .sorted(Comparator
+                        .comparingLong(Tuple::getTimestamp)
+                        .thenComparing(Tuple::getKey))
+                .toList();
     }
 }
