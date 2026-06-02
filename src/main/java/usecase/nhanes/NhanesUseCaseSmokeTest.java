@@ -18,6 +18,7 @@ import usecase.common.TupleFieldValueSampler;
 import usecase.common.TupleMatchingScore;
 import usecase.common.TupleMatchingScore.DistanceMode;
 import usecase.common.TupleMatchingScore.Key;
+import usecase.common.analysis.QueryResult;
 
 public final class NhanesUseCaseSmokeTest {
 
@@ -110,8 +111,7 @@ public final class NhanesUseCaseSmokeTest {
 
     private static void runMainQuery() {
         List<Tuple> tuples = NhanesTupleLoader.load();
-        MainQuery mainQuery = new MainQuery();
-        MainQuery.QueryResult result = mainQuery.process(tuples, "smoke");
+        QueryResult result = MainQuery.process(tuples, "smoke");
         int aggregateStatsCount = result.outputAggregatedStats().size();
         int outlierCount = result.outputOutliers().size();
         System.out.printf("mainQueryInput=%d%n", tuples.size());

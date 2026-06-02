@@ -1,4 +1,4 @@
-package usecase.nhanes;
+package usecase.common.analysis;
 
 import component.operator.in1.aggregate.BaseTimeWindowAdd;
 import component.operator.in1.aggregate.TimeWindowAdd;

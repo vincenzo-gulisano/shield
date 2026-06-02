@@ -1,4 +1,4 @@
-package usecase.nhanes;
+package usecase.common.analysis;
 
 import component.operator.in1.aggregate.BaseTimeWindowAdd;
 import component.operator.in1.aggregate.TimeWindowAdd;
@@ -15,13 +15,25 @@ import usecase.common.Tuple;
  */
 public final class OutlierTimeWindow extends BaseTimeWindowAdd<Tuple, ListTuple> {
 
-    private static final double OUTLIER_SCORE_QUANTILE = 0.95;
+    private static final double DEFAULT_OUTLIER_SCORE_QUANTILE = 0.95;
 
+    private final double outlierScoreQuantile;
     private final List<Tuple> tuples = new ArrayList<>();
+
+    public OutlierTimeWindow() {
+        this(DEFAULT_OUTLIER_SCORE_QUANTILE);
+    }
+
+    public OutlierTimeWindow(double outlierScoreQuantile) {
+        if (outlierScoreQuantile < 0.0 || outlierScoreQuantile > 1.0 || Double.isNaN(outlierScoreQuantile)) {
+            throw new IllegalArgumentException("outlierScoreQuantile must be in [0, 1]");
+        }
+        this.outlierScoreQuantile = outlierScoreQuantile;
+    }
 
     @Override
     public TimeWindowAdd<Tuple, ListTuple> factory() {
-        return new OutlierTimeWindow();
+        return new OutlierTimeWindow(outlierScoreQuantile);
     }
 
     @Override
@@ -35,7 +47,7 @@ public final class OutlierTimeWindow extends BaseTimeWindowAdd<Tuple, ListTuple>
         List<Tuple> outliers = OutlierDetector.findOutliersAtOrAboveScoreQuantile(
                 tuples,
                 startTimestamp,
-                OUTLIER_SCORE_QUANTILE);
+                outlierScoreQuantile);
         return new ListTuple(startTimestamp, outputKey, outliers);
     }
 }

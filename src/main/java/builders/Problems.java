@@ -24,6 +24,7 @@ import problem.StreamAnonymizationProblem;
 import problem.StreamAnonymizationProblem_2ObjectivesPerf;
 import problem.StreamAnonymizationProblem_2ObjectivesRes;
 import problem.utils.PrivacyMetricChoice;
+import usecase.lcl.LclStreamAnonymizationProblem;
 import usecase.nhanes.NhanesStreamAnonymizationProblem;
 
 @Discoverable(prefixTemplate = "anonym.problem")
@@ -64,6 +65,23 @@ public class Problems {
             @Param(value = "name", iS = "{inputCsvPath}") String name) {
 
         return new NhanesStreamAnonymizationProblem(
+                inputCsvPath,
+                privacyMetric,
+                fidelityF1Threshold,
+                semanticsF1Threshold,
+                k);
+    }
+
+    @Cacheable
+    public static LclStreamAnonymizationProblem lclStreamAnonymizationProblem(
+            @Param("inputCsvPath") String inputCsvPath,
+            @Param(value = "privacyMetric", dS = "K_ANONYMITY_CARDINALITY") PrivacyMetricChoice privacyMetric,
+            @Param(value = "fidelityF1Threshold", dD = 0.05) double fidelityF1Threshold,
+            @Param(value = "semanticsF1Threshold", dD = 0.05) double semanticsF1Threshold,
+            @Param(value = "k", dI = 50) int k,
+            @Param(value = "name", iS = "{inputCsvPath}") String name) {
+
+        return new LclStreamAnonymizationProblem(
                 inputCsvPath,
                 privacyMetric,
                 fidelityF1Threshold,

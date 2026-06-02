@@ -1,4 +1,4 @@
-package usecase.nhanes;
+package usecase.common.analysis;
 
 import java.util.ArrayList;
 import java.util.Collections;

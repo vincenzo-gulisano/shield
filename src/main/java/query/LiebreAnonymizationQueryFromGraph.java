@@ -33,7 +33,7 @@ public class LiebreAnonymizationQueryFromGraph {
 
         final List<Tuple> collectedEvents = Collections.synchronizedList(new ArrayList<>());
 
-        Query query = new Query(100000);
+        Query query = new Query();
 
         SourceFunction<Tuple> collectionSource = CollectionSourceFactory.fromList(inputTuples, 0L);
 

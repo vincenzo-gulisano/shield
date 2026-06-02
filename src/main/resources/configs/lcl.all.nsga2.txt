@@ -1,0 +1,51 @@
+$basePath = ''outputs/{^^.name}/{^^.startTime}/''
+$minTreeH = 4
+$maxTreeH = 16
+
+ea.experiment(
+  runs = (randomGenerator = (seed = [1:1:1])
+    * [m.defaultRG()])
+    * (solver = (stop = ea.sc.nOfQualityEvaluations(n = 1000))
+    * [
+      ea.s.nsga2(
+        nPop = 100;
+        representation = ea.r.cfgTree(
+          minTreeH = $minTreeH;
+          maxTreeH = $maxTreeH;
+          grammar = ea.grammar.fromFile(
+            path = "src/main/resources/grammars/lcl/lcl.complete.bnf"));
+        mapper = anonym.mapper.queryMapperWithSampler(
+          fieldValueSampler = anonym.valueSampler.lclTupleFieldValueSampler(
+            inputCsvPath = "datasets/lcl_10days_100keys.csv";
+            seed = 0
+          )
+        )
+      )
+    ])
+    * [
+    ea.run(
+      problem = anonym.problem.lclStreamAnonymizationProblem(
+        inputCsvPath = "datasets/lcl_10days_100keys.csv";
+        privacyMetric = LINKAGE_ATTACK_TOP_K_CONTAINMENT;
+        fidelityF1Threshold = 0.05;
+        semanticsF1Threshold = 0.05;
+        k = 10
+      )
+    )
+  ];
+  listeners = [
+    anonym.l.liebreTerminator();
+    ea.l.console(eFunctions = [
+      ea.f.size(of = ea.f.genotype(of = ea.f.best()); format = "%3d")
+    ]);
+    ea.l.csv(
+      path = $basePath + "solutions-percentile.csv";
+      eFunctions = [
+        f.mapValue(key = privacy; of = ea.f.quality(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality()))));
+        f.mapValue(key = "semantics"; of = ea.f.quality(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = "semantics"; of = ea.f.quality()))));
+        f.mapValue(key = "fidelity"; of = ea.f.quality(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = "fidelity"; of = ea.f.quality()))));
+        ea.f.solution(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality())))
+      ]
+    )
+  ]
+)

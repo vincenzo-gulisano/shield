@@ -1,8 +1,8 @@
-package usecase.nhanes;
+package usecase.common.analysis;
 
 import java.util.ArrayList;
 import java.util.List;
-import usecase.nhanes.TupleFeatureStats.FeatureStats;
+import usecase.common.analysis.TupleFeatureStats.FeatureStats;
 import usecase.common.Tuple;
 
 /**

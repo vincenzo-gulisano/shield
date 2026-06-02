@@ -49,7 +49,7 @@ public class MainQuery {
                 minTs, maxTs, resolution);
 
         final List<Tuple> collectedEvents = Collections.synchronizedList(new ArrayList<>());
-        Query query = new Query(100000);
+        Query query = new Query();
 
         // Create and add a source that reads from the provided in-memory list
         SourceFunction<Tuple> collectionSource = CollectionSourceFactory.fromList(inputStream);
