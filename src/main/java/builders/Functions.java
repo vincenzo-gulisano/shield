@@ -144,6 +144,22 @@ public class Functions {
   }
 
   @Cacheable
+  public static <X, N, A> NamedFunction<X, Integer> graphFilterDuplicateCategory(
+      @Param(value = "name", dS = "graph.filter.duplicate.category") String name,
+      @Param(value = "of", dNPM = "f.identity()") Function<X, Graph<N, A>> beforeF) {
+    Function<Graph<N, A>, Integer> f = g -> {
+      boolean hasFilter = false;
+      boolean hasDuplicate = false;
+      for (N node : g.nodes()) {
+        hasFilter |= node instanceof QueryMapper.FilterOperator;
+        hasDuplicate |= node instanceof QueryMapper.MapDuplicate;
+      }
+      return (hasFilter ? 1 : 0) + (hasDuplicate ? 2 : 0);
+    };
+    return NamedFunction.from(f, name).compose(beforeF);
+  }
+
+  @Cacheable
   public static <X, N, A> NamedFunction<X, Integer> graphFiltersCount(
       @Param(value = "name", dS = "graph.filters.count") String name,
       @Param(value = "of", dNPM = "f.identity()") Function<X, Graph<N, A>> beforeF) {
@@ -151,6 +167,22 @@ public class Functions {
       int count = 0;
       for (N node : g.nodes()) {
         if (node instanceof QueryMapper.FilterOperator) {
+          count++;
+        }
+      }
+      return count;
+    };
+    return NamedFunction.from(f, name).compose(beforeF);
+  }
+
+  @Cacheable
+  public static <X, N, A> NamedFunction<X, Integer> graphOperatorsCountExceptSourceSink(
+      @Param(value = "name", dS = "graph.operators.count.except.source.sink") String name,
+      @Param(value = "of", dNPM = "f.identity()") Function<X, Graph<N, A>> beforeF) {
+    Function<Graph<N, A>, Integer> f = g -> {
+      int count = 0;
+      for (N node : g.nodes()) {
+        if (!(node instanceof QueryMapper.Source) && !(node instanceof QueryMapper.Sink)) {
           count++;
         }
       }
