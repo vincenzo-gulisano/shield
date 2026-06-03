@@ -1,6 +1,6 @@
 $basePath = ''outputs/{^^.name}/{^^.startTime}/''
 $minTreeH = 4
-$maxTreeH = 16
+$maxTreeH = 12
 $imgType = svg
 $nPop = 200
 
@@ -9,33 +9,19 @@ ea.experiment(
     * [m.defaultRG()])
     * (solver = (stop = ea.sc.nOfQualityEvaluations(n = 20000))
     * [
-      ea.s.mapElites(
+      ea.s.nsga2(
         nPop = $nPop;
         representation = ea.r.cfgTree(
           minTreeH = $minTreeH;
           maxTreeH = $maxTreeH;
           grammar = ea.grammar.fromFile(
-            path = "src/main/resources/grammars/lcl/lcl.complete.bnf"));
+            path = "src/main/resources/grammars/lcl/lcl.no-filter-duplicate.bnf"));
         mapper = anonym.mapper.queryMapperWithSampler(
           fieldValueSampler = anonym.valueSampler.lclTupleFieldValueSampler(
             inputCsvPath = "datasets/lcl_10days_100keys.csv";
             seed = 0
           )
-        );
-        descriptors = [
-          ea.s.me.d.descriptor(
-            f = anonym.f.graphFilterDuplicateCategory(of = ea.f.solution());
-            min = 0;
-            max = 3;
-            nOfBins = 4
-          );
-          ea.s.me.d.descriptor(
-            f = anonym.f.graphOperatorsCountExceptSourceSink(of = ea.f.solution());
-            min = 0;
-            max = 40;
-            nOfBins = 41
-          )
-        ]
+        )
       )
     ])
     * [
@@ -183,18 +169,6 @@ ea.experiment(
           plot = ea.plot.multi.xyExp(y = f.percentile(p = 75; of = f.each(of = ea.f.all(); mapF = f.mapValue(key = "fidelity"; of = ea.f.quality()))));
           configuration = viz.plot.conf.image(axesShow = all; axesIndependences = [all]);
           type = svg
-    );
-    ea.l.savePlotForRun(
-      path = $basePath + "{solver.name}/{problem.name}/{randomGenerator.seed}/archive." + $imgType;
-      plot = ea.plot.single.me(
-        values = [
-          f.mapValue(key = privacy; of = ea.f.quality());
-          f.mapValue(key = fidelity; of = ea.f.quality());
-          f.mapValue(key = semantics; of = ea.f.quality())
-        ]
-      );
-      kCondition = predicate.matches(f = f.mappableKey(key = "solver.name"); regex = "me");
-      type = $imgType
     )
   ]
 )
