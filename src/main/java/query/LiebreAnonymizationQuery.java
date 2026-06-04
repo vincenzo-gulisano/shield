@@ -10,7 +10,6 @@ import event.GenericEvent;
 import mappers.QueryRepresentation;
 import query.utils.MovingAggregateMap;
 import query.utils.OperatorUtils;
-import query.utils.RIRMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

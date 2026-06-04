@@ -33,7 +33,6 @@ public class GrammarGeneratorMap {
 
     // Generate a grammar to define operators like filters as strings and save the grammar in a file
     public static void generateGrammar(List<String> attributes, String filePath) {
-
         StringBuilder sb = new StringBuilder();
 
         sb.append("<pipeline> ::= <operator> | <operator> <pipeline>\n");

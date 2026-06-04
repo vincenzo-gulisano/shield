@@ -59,6 +59,10 @@ public class TreeToRepresentation {
             case "<map_noise>" -> operator = parseMapNoiseNode(specificOpNode);
             case "<map_rir>" -> operator = parseMapRirNode(specificOpNode);
             case "<map_aggregate>" -> operator = parseMapAggregateNode(specificOpNode);
+            case "<map_timestamp_pairwise_swap>", "<map_timestamp_pairwise_swap_nominal>",
+                    "<map_timestamp_pairwise_swap_discrete_numeric>",
+                    "<map_timestamp_pairwise_swap_continuous_numeric>" ->
+                    logger.warn("Ignoring graph-only operator in legacy representation: {}", specificOpNode.content());
             // TODO ideally, here you should handle also "<fork_ops_join>"
             default -> logger.warn("Unknown operator type found in grammar tree: {}", specificOpNode.content());
         }

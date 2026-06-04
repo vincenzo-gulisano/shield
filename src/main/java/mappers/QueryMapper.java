@@ -45,6 +45,7 @@ import query.utils.MapAggregateFunction;
 import query.utils.MapDuplicateFunction;
 import query.utils.MapNoiseFunction;
 import query.utils.RIRMap;
+import query.utils.TimestampPairwiseFieldSwapFunction;
 import usecase.common.FieldValueSampler;
 import usecase.common.Tuple;
 
@@ -206,6 +207,13 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
             parseMapAggregateNode(specificOpNode, id),
             previousNode, g);
       }
+      case "<map_timestamp_pairwise_swap>", "<map_timestamp_pairwise_swap_nominal>",
+          "<map_timestamp_pairwise_swap_discrete_numeric>", "<map_timestamp_pairwise_swap_continuous_numeric>" -> {
+        String id = "MTS" + operatorCounters.merge("MapTimestampPairwiseSwap", 1, Integer::sum);
+        return addSimpleOperatorStepToGraph(
+            parseMapTimestampPairwiseSwapNode(specificOpNode, id),
+            previousNode, g);
+      }
       case "<fork_ops_join>" -> {
         return parseForkJoinNode(specificOpNode, previousNode, g, operatorCounters);
       }
@@ -309,6 +317,10 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     return new MapAggregate(id, specificOpNode.child(0).child(0).content(),
         MapAggregateAggregatorFunction.valueOf(specificOpNode.child(1).child(0).content().toUpperCase()),
         Integer.valueOf(specificOpNode.child(2).child(0).content()));
+  }
+
+  private OperatorRepresentation parseMapTimestampPairwiseSwapNode(Tree<String> specificOpNode, String id) {
+    return new MapTimestampPairwiseSwap(id, parseTokenNode(specificOpNode.child(0)).replace("'", ""));
   }
 
   private OperatorRepresentation parseForkJoinNode(Tree<String> specificOpNode,
@@ -424,7 +436,9 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
           "<map_duplicate>", "<map_noise>", "<map_noise_nominal>", "<map_noise_discrete_numeric>",
           "<map_noise_continuous_numeric>", "<map_rir>", "<map_rir_nominal>", "<map_rir_discrete_numeric>",
           "<map_rir_continuous_numeric>", "<map_aggregate>", "<map_aggregate_discrete_numeric>",
-          "<map_aggregate_continuous_numeric>", "<fork_ops_join>", "<fork_discrete_numeric>",
+          "<map_aggregate_continuous_numeric>", "<map_timestamp_pairwise_swap>",
+          "<map_timestamp_pairwise_swap_nominal>", "<map_timestamp_pairwise_swap_discrete_numeric>",
+          "<map_timestamp_pairwise_swap_continuous_numeric>", "<fork_ops_join>", "<fork_discrete_numeric>",
           "<fork_continuous_numeric>", "<fork_nominal>" -> true;
       default -> false;
     };
@@ -455,6 +469,9 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     }
     if (node instanceof QueryMapper.MapAggregate mapAggregate) {
       return mapAggregate.field();
+    }
+    if (node instanceof QueryMapper.MapTimestampPairwiseSwap mapTimestampPairwiseSwap) {
+      return mapTimestampPairwiseSwap.field();
     }
     if (node instanceof QueryMapper.ConditionalFork conditionalFork) {
       return conditionalFork.field();
@@ -495,7 +512,8 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
   }
 
   public sealed interface OperatorRepresentation
-      permits FilterOperator, MapDuplicate, MapNoise, MapRIR, MapAggregate, Fork, ConditionalFork, Union, Source, Sink {
+      permits FilterOperator, MapDuplicate, MapNoise, MapRIR, MapAggregate, MapTimestampPairwiseSwap, Fork,
+      ConditionalFork, Union, Source, Sink {
     public String getID();
   }
 
@@ -583,6 +601,17 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
 
     public MapAggregateFunction createMapFunction() {
       return new MapAggregateFunction(field, aggFunction, windowSize);
+    }
+  }
+
+  public record MapTimestampPairwiseSwap(String id, String field) implements OperatorRepresentation {
+    @Override
+    public String getID() {
+      return id;
+    }
+
+    public TimestampPairwiseFieldSwapFunction createMapFunction() {
+      return new TimestampPairwiseFieldSwapFunction(field);
     }
   }
 
@@ -683,6 +712,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
       case "MapNoise" -> parseMapNoiseFromString(representation);
       case "MapRIR" -> parseMapRIRFromString(representation);
       case "MapAggregate" -> parseMapAggregateFromString(representation);
+      case "MapTimestampPairwiseSwap" -> parseMapTimestampPairwiseSwapFromString(representation);
       case "Fork" -> parseForkFromString(representation);
       case "ConditionalFork" -> parseConditionalForkFromString(representation);
       case "Union" -> parseUnionFromString(representation);
@@ -732,6 +762,13 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
         requiredParam(params, "field", representation),
         MapAggregateAggregatorFunction.valueOf(requiredParam(params, "aggFunction", representation)),
         Integer.parseInt(requiredParam(params, "windowSize", representation)));
+  }
+
+  public static MapTimestampPairwiseSwap parseMapTimestampPairwiseSwapFromString(String representation) {
+    Map<String, String> params = parseOperatorParams(representation, "MapTimestampPairwiseSwap");
+    return new MapTimestampPairwiseSwap(
+        requiredParam(params, "id", representation),
+        requiredParam(params, "field", representation));
   }
 
   public static Fork parseForkFromString(String representation) {

@@ -153,4 +153,5 @@ public record QueryRepresentation(
             );
         }
     }
+
 }

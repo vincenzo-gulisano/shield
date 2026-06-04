@@ -44,74 +44,11 @@ public class Functions {
    * bit 3 = MapRIR
    * bit 4 = MapAggregate
    * bit 5 = Fork or ConditionalFork
+   * bit 6 = MapTimestampPairwiseSwap
    *
    * Source, Sink, and Union are structural nodes and do not contribute to the bitmap.
    *
-   * All possible returned values for the 6 supported operator types:
-   *  0 = ()
-   *  1 = (FilterOperator)
-   *  2 = (MapDuplicate)
-   *  3 = (FilterOperator, MapDuplicate)
-   *  4 = (MapNoise)
-   *  5 = (FilterOperator, MapNoise)
-   *  6 = (MapDuplicate, MapNoise)
-   *  7 = (FilterOperator, MapDuplicate, MapNoise)
-   *  8 = (MapRIR)
-   *  9 = (FilterOperator, MapRIR)
-   * 10 = (MapDuplicate, MapRIR)
-   * 11 = (FilterOperator, MapDuplicate, MapRIR)
-   * 12 = (MapNoise, MapRIR)
-   * 13 = (FilterOperator, MapNoise, MapRIR)
-   * 14 = (MapDuplicate, MapNoise, MapRIR)
-   * 15 = (FilterOperator, MapDuplicate, MapNoise, MapRIR)
-   * 16 = (MapAggregate)
-   * 17 = (FilterOperator, MapAggregate)
-   * 18 = (MapDuplicate, MapAggregate)
-   * 19 = (FilterOperator, MapDuplicate, MapAggregate)
-   * 20 = (MapNoise, MapAggregate)
-   * 21 = (FilterOperator, MapNoise, MapAggregate)
-   * 22 = (MapDuplicate, MapNoise, MapAggregate)
-   * 23 = (FilterOperator, MapDuplicate, MapNoise, MapAggregate)
-   * 24 = (MapRIR, MapAggregate)
-   * 25 = (FilterOperator, MapRIR, MapAggregate)
-   * 26 = (MapDuplicate, MapRIR, MapAggregate)
-   * 27 = (FilterOperator, MapDuplicate, MapRIR, MapAggregate)
-   * 28 = (MapNoise, MapRIR, MapAggregate)
-   * 29 = (FilterOperator, MapNoise, MapRIR, MapAggregate)
-   * 30 = (MapDuplicate, MapNoise, MapRIR, MapAggregate)
-   * 31 = (FilterOperator, MapDuplicate, MapNoise, MapRIR, MapAggregate)
-   * 32 = (Fork)
-   * 33 = (FilterOperator, Fork)
-   * 34 = (MapDuplicate, Fork)
-   * 35 = (FilterOperator, MapDuplicate, Fork)
-   * 36 = (MapNoise, Fork)
-   * 37 = (FilterOperator, MapNoise, Fork)
-   * 38 = (MapDuplicate, MapNoise, Fork)
-   * 39 = (FilterOperator, MapDuplicate, MapNoise, Fork)
-   * 40 = (MapRIR, Fork)
-   * 41 = (FilterOperator, MapRIR, Fork)
-   * 42 = (MapDuplicate, MapRIR, Fork)
-   * 43 = (FilterOperator, MapDuplicate, MapRIR, Fork)
-   * 44 = (MapNoise, MapRIR, Fork)
-   * 45 = (FilterOperator, MapNoise, MapRIR, Fork)
-   * 46 = (MapDuplicate, MapNoise, MapRIR, Fork)
-   * 47 = (FilterOperator, MapDuplicate, MapNoise, MapRIR, Fork)
-   * 48 = (MapAggregate, Fork)
-   * 49 = (FilterOperator, MapAggregate, Fork)
-   * 50 = (MapDuplicate, MapAggregate, Fork)
-   * 51 = (FilterOperator, MapDuplicate, MapAggregate, Fork)
-   * 52 = (MapNoise, MapAggregate, Fork)
-   * 53 = (FilterOperator, MapNoise, MapAggregate, Fork)
-   * 54 = (MapDuplicate, MapNoise, MapAggregate, Fork)
-   * 55 = (FilterOperator, MapDuplicate, MapNoise, MapAggregate, Fork)
-   * 56 = (MapRIR, MapAggregate, Fork)
-   * 57 = (FilterOperator, MapRIR, MapAggregate, Fork)
-   * 58 = (MapDuplicate, MapRIR, MapAggregate, Fork)
-   * 59 = (FilterOperator, MapDuplicate, MapRIR, MapAggregate, Fork)
-   * 60 = (MapNoise, MapRIR, MapAggregate, Fork)
-   * 61 = (FilterOperator, MapNoise, MapRIR, MapAggregate, Fork)
-   * 62 = (MapDuplicate, MapNoise, MapRIR, MapAggregate, Fork)
-   * 63 = (FilterOperator, MapDuplicate, MapNoise, MapRIR, MapAggregate, Fork)
+   * Returned values are bitwise OR combinations of the supported operator-type bits.
    */
   @Cacheable
   public static <X, N, A> NamedFunction<X, Integer> graphOperatorsBitmapEntry(
@@ -226,6 +163,9 @@ public class Functions {
     }
     if (node instanceof QueryMapper.Fork || node instanceof QueryMapper.ConditionalFork) {
       return 1 << 5;
+    }
+    if (node instanceof QueryMapper.MapTimestampPairwiseSwap) {
+      return 1 << 6;
     }
     return 0;
   }
