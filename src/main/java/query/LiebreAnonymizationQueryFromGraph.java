@@ -10,9 +10,9 @@ import io.github.ericmedvet.jgea.core.representation.graph.Graph;
 import io.github.ericmedvet.jgea.core.representation.graph.Graph.Arc;
 import mappers.QueryMapper.ArcType;
 import mappers.QueryMapper.OperatorRepresentation;
+import query.utils.FlushableFlatMapOperator;
 import usecase.common.CollectionSourceFactory;
 import usecase.common.Tuple;
-import query.utils.TimestampPairwiseFieldSwapOperator;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,7 +64,7 @@ public class LiebreAnonymizationQueryFromGraph {
                 }
                 case mappers.QueryMapper.MapTimestampPairwiseSwap m -> {
                     operators.put(m.getID(),
-                            query.addOperator(new TimestampPairwiseFieldSwapOperator(m.getID(), m.createMapFunction())));
+                            query.addOperator(new FlushableFlatMapOperator<>(m.getID(), m.createMapFunction())));
                 }
                 case mappers.QueryMapper.Fork f -> {
                     operators.put(f.getID(), query.addRouterOperator(f.getID()));

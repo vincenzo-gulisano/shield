@@ -4,14 +4,13 @@ import component.operator.in1.map.FlatMapOperator;
 import java.util.List;
 
 /**
- * Flat-map operator that exposes {@link TimestampPairwiseFieldSwapFunction#flush()} to Liebre's
- * end-of-input lifecycle.
+ * Flat-map operator that gives stateful flat-map functions an end-of-input flush hook.
  */
-public class TimestampPairwiseFieldSwapOperator<IN, OUT> extends FlatMapOperator<IN, OUT> {
+public class FlushableFlatMapOperator<IN, OUT> extends FlatMapOperator<IN, OUT> {
 
     private final FlushableFlatMapFunction<IN, OUT> function;
 
-    public TimestampPairwiseFieldSwapOperator(String id, FlushableFlatMapFunction<IN, OUT> function) {
+    public FlushableFlatMapOperator(String id, FlushableFlatMapFunction<IN, OUT> function) {
         super(id, function);
         this.function = function;
     }

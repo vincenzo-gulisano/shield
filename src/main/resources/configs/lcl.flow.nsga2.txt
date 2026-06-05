@@ -1,0 +1,51 @@
+$basePath = ''outputs/{^^.name}/{^^.startTime}/''
+$minTreeH = 4
+$maxTreeH = 12
+$nPop = 100
+
+ea.experiment(
+  runs = (randomGenerator = (seed = [1:1:1])
+    * [m.defaultRG()])
+    * (solver = (stop = ea.sc.nOfQualityEvaluations(n = 1000))
+    * [
+      ea.s.nsga2(
+        nPop = $nPop;
+        representation = ea.r.cfgTree(
+          minTreeH = $minTreeH;
+          maxTreeH = $maxTreeH;
+          grammar = ea.grammar.fromFile(
+            path = "src/main/resources/grammars/lcl/lcl.flow.complete.bnf"));
+        mapper = anonym.mapper.queryMapperWithSampler(
+          fieldValueSampler = anonym.valueSampler.lclFlowTupleFieldValueSampler(
+            inputCsvPath = "datasets/lcl_flow_daily_10days_100keys.csv";
+            seed = 0
+          )
+        )
+      )
+    ])
+    * [
+    ea.run(
+      problem = anonym.problem.lclFlowStreamAnonymizationProblem(
+        inputCsvPath = "datasets/lcl_flow_daily_10days_100keys.csv";
+        privacyMetric = LINKAGE_ATTACK_TOP_K_CONTAINMENT;
+        semanticsF1Threshold = 0.05;
+        k = 10
+      )
+    )
+  ];
+  listeners = [
+    anonym.l.liebreTerminator();
+    ea.l.console(eFunctions = [
+      ea.f.size(of = ea.f.genotype(of = ea.f.best()); format = "%3d")
+    ]);
+    ea.l.csv(
+      path = $basePath + "solutions.csv";
+      eFunctions = [
+        f.mapValue(key = privacy; of = ea.f.quality());
+        f.mapValue(key = fidelity; of = ea.f.quality());
+        f.mapValue(key = semantics; of = ea.f.quality());
+        ea.f.solution()
+      ]
+    )
+  ]
+)

@@ -54,9 +54,9 @@ public class TimestampPairwiseFieldSwapFunction implements FlushableFlatMapFunct
     /**
      * Emit the final unpaired tuple unchanged.
      *
-     * <p>Liebre calls this through {@link TimestampPairwiseFieldSwapOperator#processEndOfInput()}.
-     * This is the only end-of-stream path and is what preserves one output per input when a
-     * timestamp group has odd cardinality or the whole stream has a single pending tuple.
+     * <p>Liebre calls this through {@link FlushableFlatMapOperator}'s end-of-input hook. This is
+     * the only end-of-stream path and is what preserves one output per input when a timestamp group
+     * has odd cardinality or the whole stream has a single pending tuple.
      */
     public List<Tuple> flush() {
         if (bufferedTuple == null) {
