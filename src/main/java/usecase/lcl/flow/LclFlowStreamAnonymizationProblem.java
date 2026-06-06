@@ -54,8 +54,8 @@ public class LclFlowStreamAnonymizationProblem implements
     private final PrivacyMetricChoice privacyMetricChoice;
     private final double semanticsF1Threshold;
     private final List<Tuple> inputTuples;
-    private final LclFlowMainQuery.Settings querySettings;
-    private final LclFlowMainQuery.QueryResult baselineOutcome;
+    private final LclFlowAllFieldsMainQuery.Settings querySettings;
+    private final LclFlowAllFieldsMainQuery.QueryResult baselineOutcome;
     private final LinkageAttackPrivacy linkageAttackPrivacy;
     private final StreamFlowSnapshotSimilarity fidelitySimilarity;
 
@@ -73,9 +73,9 @@ public class LclFlowStreamAnonymizationProblem implements
         this.inputTuples = LclFlowTupleReader.loadUnchecked(inputCsvPath);
         long minTimestamp = this.inputTuples.stream().mapToLong(Tuple::getTimestamp).min().orElseThrow();
         long maxTimestamp = this.inputTuples.stream().mapToLong(Tuple::getTimestamp).max().orElseThrow();
-        this.querySettings = LclFlowMainQuery.Settings.defaults()
+        this.querySettings = LclFlowAllFieldsMainQuery.Settings.defaults()
                 .withInstrumentationRange(minTimestamp, maxTimestamp);
-        this.baselineOutcome = LclFlowMainQuery.process(this.inputTuples, "main", querySettings);
+        this.baselineOutcome = LclFlowAllFieldsMainQuery.process(this.inputTuples, "main", querySettings);
         this.linkageAttackPrivacy = new LinkageAttackPrivacy(
                 this.inputTuples,
                 k,
@@ -107,8 +107,8 @@ public class LclFlowStreamAnonymizationProblem implements
                     return qualities;
                 }
 
-                LclFlowMainQuery.QueryResult modifiedOutcome =
-                        LclFlowMainQuery.process(modifiedEvents, queryId, querySettings);
+                LclFlowAllFieldsMainQuery.QueryResult modifiedOutcome =
+                        LclFlowAllFieldsMainQuery.process(modifiedEvents, queryId, querySettings);
                 qualities.put("fidelity", fidelitySimilarity.apply(modifiedOutcome.flow()));
                 qualities.put("semantics", TupleMatchingScore.f1(
                         TupleMatchingScore.groupByTimestampAndKey(baselineOutcome.outputTuples()),
@@ -125,7 +125,7 @@ public class LclFlowStreamAnonymizationProblem implements
         };
     }
 
-    public LclFlowMainQuery.QueryResult baselineOutcome() {
+    public LclFlowAllFieldsMainQuery.QueryResult baselineOutcome() {
         return baselineOutcome;
     }
 

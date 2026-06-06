@@ -20,12 +20,20 @@ public final class LclFlowSmokeTest {
 
         System.err.println("Loading LCL flow resource");
         List<Tuple> input = LclFlowTupleReader.readDefaultResource();
-        System.err.println("Running LCL flow query on " + input.size() + " tuples");
+        System.err.println("Running all-fields LCL flow query on " + input.size() + " tuples");
         long start = System.nanoTime();
-        LclFlowMainQuery.QueryResult result = LclFlowMainQuery.process(input, "smoke");
+        LclFlowAllFieldsMainQuery.QueryResult result = LclFlowAllFieldsMainQuery.process(input, "smoke");
         System.err.println("Writing LCL flow images");
         long elapsedMillis = Math.round((System.nanoTime() - start) / 1_000_000.0);
 
+        long stdOutputs = result.outputTuples().stream().filter(tuple -> tuple.getKey().equals("tariff_0")).count();
+        long touOutputs = result.outputTuples().stream().filter(tuple -> tuple.getKey().equals("tariff_1")).count();
+        if (stdOutputs == 0L || touOutputs == 0L) {
+            throw new IllegalStateException("Expected non-empty Std and ToU outputs");
+        }
+        if (result.outputTuples().stream().anyMatch(tuple -> tuple.getNumFields() != 13)) {
+            throw new IllegalStateException("Expected all-fields query outputs to have 13 fields");
+        }
         FlowImageWriter.writeSnapshotImages(result.flow(), outputDir);
         StreamFlowSnapshotSimilarity flowSimilarity = new StreamFlowSnapshotSimilarity(result.flow());
         double identityFidelity = flowSimilarity.apply(result.flow());
@@ -43,6 +51,7 @@ public final class LclFlowSmokeTest {
                 result.flow().streamNames().size(),
                 result.flow().timeBins(),
                 elapsedMillis);
+        System.out.printf("Branch outputs: std=%d tou=%d%n", stdOutputs, touOutputs);
         System.out.printf(
                 "Sanity scores: identityFidelity=%.3f emptyFidelity=%.3f identitySemantics=%.3f%n",
                 identityFidelity,

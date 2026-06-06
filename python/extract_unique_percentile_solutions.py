@@ -73,6 +73,10 @@ class Solution:
             + (1.0 - self.fidelity) ** 2
         )
 
+    @property
+    def min_metric(self) -> float:
+        return min(self.privacy, self.semantics, self.fidelity)
+
 
 def read_unique_solutions(input_csv: Path) -> list[Solution]:
     unique_by_individual: dict[str, Solution] = {}
@@ -114,6 +118,7 @@ def write_solutions_csv(solutions: list[Solution], output_csv: Path, image_names
     with output_csv.open("w", newline="") as f:
         fieldnames = [
             "rank",
+            "min_privacy_semantics_fidelity",
             "distance_from_perfect",
             "privacy",
             "semantics",
@@ -129,6 +134,7 @@ def write_solutions_csv(solutions: list[Solution], output_csv: Path, image_names
             writer.writerow(
                 {
                     "rank": rank,
+                    "min_privacy_semantics_fidelity": f"{solution.min_metric:.12g}",
                     "distance_from_perfect": f"{solution.distance:.12g}",
                     "privacy": f"{solution.privacy:.12g}",
                     "semantics": f"{solution.semantics:.12g}",
@@ -147,19 +153,32 @@ def main() -> None:
     )
     parser.add_argument("input_csv", type=Path, help="Path to solutions-percentile.csv.")
     parser.add_argument("output_dir", type=Path, help="Folder where the CSV and PNG files are written.")
+    parser.add_argument(
+        "--png-limit",
+        type=int,
+        default=20,
+        help="Number of top-ranked unique individuals to render as PNG files (default: 20).",
+    )
     args = parser.parse_args()
+
+    if args.png_limit < 0:
+        raise ValueError("--png-limit cannot be negative")
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     solutions = read_unique_solutions(args.input_csv)
-    image_names = [image_name(rank, solution) for rank, solution in enumerate(solutions, start=1)]
+    image_names = [
+        image_name(rank, solution) if rank <= args.png_limit else ""
+        for rank, solution in enumerate(solutions, start=1)
+    ]
 
     output_csv = args.output_dir / "unique_solutions.csv"
     write_solutions_csv(solutions, output_csv, image_names)
     for solution, image in zip(solutions, image_names):
-        render_graph_printout(solution.individual, args.output_dir / image, verbose=False)
+        if image:
+            render_graph_printout(solution.individual, args.output_dir / image, verbose=False)
 
     print(f"Wrote {len(solutions)} unique solutions to {output_csv}")
-    print(f"Wrote {len(solutions)} PNG files to {args.output_dir}")
+    print(f"Wrote {min(len(solutions), args.png_limit)} PNG files to {args.output_dir}")
 
 
 if __name__ == "__main__":
