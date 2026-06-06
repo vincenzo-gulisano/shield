@@ -29,8 +29,8 @@ ea.experiment(
       problem = anonym.problem.lclFlowStreamAnonymizationProblem(
         inputCsvPath = "datasets/lcl_flow_daily_10days_100keys.csv";
         privacyMetric = LINKAGE_ATTACK_TOP_K_CONTAINMENT;
-        semanticsF1Threshold = 0.05;
-        k = 10
+        semanticsF1Threshold = 0.02;
+        k = 20
       )
     )
   ];
