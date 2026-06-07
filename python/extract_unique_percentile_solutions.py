@@ -64,6 +64,7 @@ class Solution:
     individual: str
     source_group: str
     source_row: int
+    seed: str
 
     @property
     def distance(self) -> float:
@@ -76,6 +77,19 @@ class Solution:
     @property
     def min_metric(self) -> float:
         return min(self.privacy, self.semantics, self.fidelity)
+
+
+def solution_rank_key(solution: Solution) -> tuple[float, float, float, float, float, str, int, str]:
+    return (
+        -solution.min_metric,
+        solution.distance,
+        -solution.privacy,
+        -solution.semantics,
+        -solution.fidelity,
+        solution.seed,
+        solution.source_row,
+        solution.source_group,
+    )
 
 
 def read_unique_solutions(input_csv: Path) -> list[Solution]:
@@ -94,11 +108,12 @@ def read_unique_solutions(input_csv: Path) -> list[Solution]:
                     individual=individual,
                     source_group=group_name,
                     source_row=source_row,
+                    seed=row.get("randomGenerator.seed", ""),
                 )
                 previous = unique_by_individual.get(individual)
-                if previous is None or solution.distance < previous.distance:
+                if previous is None or solution_rank_key(solution) < solution_rank_key(previous):
                     unique_by_individual[individual] = solution
-    return sorted(unique_by_individual.values(), key=lambda s: (s.distance, s.privacy, s.semantics, s.fidelity))
+    return sorted(unique_by_individual.values(), key=solution_rank_key)
 
 
 def image_name(rank: int, solution: Solution) -> str:
@@ -107,17 +122,34 @@ def image_name(rank: int, solution: Solution) -> str:
         f"_s{format_score(solution.semantics)}"
         f"_f{format_score(solution.fidelity)}"
     )
-    return f"{rank:04d}_{score_part}.png"
+    seed_part = f"seed{safe_filename_part(solution.seed)}" if solution.seed else "seed_unknown"
+    return f"{rank:04d}_{seed_part}_{score_part}.png"
 
 
 def format_score(value: float) -> str:
     return re.sub(r"[^0-9]+", "_", f"{value:.6f}").strip("_")
 
 
+def safe_filename_part(value: str) -> str:
+    return re.sub(r"[^A-Za-z0-9._-]+", "_", value).strip("_") or "unknown"
+
+
+def image_title(rank: int, solution: Solution) -> str:
+    seed = solution.seed or "unknown"
+    return (
+        f"rank={rank} seed={seed} "
+        f"min={solution.min_metric:.6g} "
+        f"privacy={solution.privacy:.6g} "
+        f"semantics={solution.semantics:.6g} "
+        f"fidelity={solution.fidelity:.6g}"
+    )
+
+
 def write_solutions_csv(solutions: list[Solution], output_csv: Path, image_names: list[str]) -> None:
     with output_csv.open("w", newline="") as f:
         fieldnames = [
             "rank",
+            "seed",
             "min_privacy_semantics_fidelity",
             "distance_from_perfect",
             "privacy",
@@ -134,6 +166,7 @@ def write_solutions_csv(solutions: list[Solution], output_csv: Path, image_names
             writer.writerow(
                 {
                     "rank": rank,
+                    "seed": solution.seed,
                     "min_privacy_semantics_fidelity": f"{solution.min_metric:.12g}",
                     "distance_from_perfect": f"{solution.distance:.12g}",
                     "privacy": f"{solution.privacy:.12g}",
@@ -173,9 +206,14 @@ def main() -> None:
 
     output_csv = args.output_dir / "unique_solutions.csv"
     write_solutions_csv(solutions, output_csv, image_names)
-    for solution, image in zip(solutions, image_names):
+    for rank, (solution, image) in enumerate(zip(solutions, image_names), start=1):
         if image:
-            render_graph_printout(solution.individual, args.output_dir / image, verbose=False)
+            render_graph_printout(
+                solution.individual,
+                args.output_dir / image,
+                verbose=False,
+                title=image_title(rank, solution),
+            )
 
     print(f"Wrote {len(solutions)} unique solutions to {output_csv}")
     print(f"Wrote {min(len(solutions), args.png_limit)} PNG files to {args.output_dir}")

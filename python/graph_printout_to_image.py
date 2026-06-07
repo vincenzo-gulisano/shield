@@ -110,13 +110,16 @@ def dot_id(raw: str) -> str:
     return "n" + hashlib.sha1(raw.encode("utf-8")).hexdigest()
 
 
-def to_dot(nodes: dict[str, Node], arcs: list[tuple[str, str]]) -> str:
+def to_dot(nodes: dict[str, Node], arcs: list[tuple[str, str]], title: str | None = None) -> str:
     lines = [
         "digraph G {",
         "  graph [rankdir=LR, bgcolor=white, pad=0.4, nodesep=0.7, ranksep=1.0];",
         "  node [shape=plain, fontname=Helvetica];",
         "  edge [color=\"#4B5563\", arrowsize=0.8, penwidth=1.6];",
     ]
+    if title:
+        escaped_title = title.replace("\\", "\\\\").replace('"', '\\"')
+        lines.append(f'  graph [label="{escaped_title}", labelloc=t, fontsize=24, fontname=Helvetica];')
     for raw, node in nodes.items():
         lines.append(f"  {dot_id(raw)} [label={node_label(node)}];")
     for source, target in arcs:
@@ -141,9 +144,10 @@ def render_graph_printout(
     output_path: Path,
     dot_path: Path | None = None,
     verbose: bool = True,
+    title: str | None = None,
 ) -> None:
     nodes, arcs = parse_graph_printout(text)
-    dot_text = to_dot(nodes, arcs)
+    dot_text = to_dot(nodes, arcs, title)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     if dot_path is not None:
