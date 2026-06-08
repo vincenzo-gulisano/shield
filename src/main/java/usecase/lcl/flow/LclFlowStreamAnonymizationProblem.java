@@ -13,6 +13,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import mappers.QueryMapper.ArcType;
 import mappers.QueryMapper.OperatorRepresentation;
+import metrics.privacy.KAnonymityPrivacyCardinality;
 import metrics.privacy.LinkageAttackPrivacy;
 import problem.utils.PrivacyMetricChoice;
 import query.LiebreAnonymizationQueryFromGraph;
@@ -56,6 +57,7 @@ public class LclFlowStreamAnonymizationProblem implements
     private final List<Tuple> inputTuples;
     private final LclFlowAllFieldsMainQuery.Settings querySettings;
     private final LclFlowAllFieldsMainQuery.QueryResult baselineOutcome;
+    private final KAnonymityPrivacyCardinality kAnonymityPrivacy;
     private final LinkageAttackPrivacy linkageAttackPrivacy;
     private final StreamFlowSnapshotSimilarity fidelitySimilarity;
 
@@ -64,9 +66,6 @@ public class LclFlowStreamAnonymizationProblem implements
             PrivacyMetricChoice privacyMetricChoice,
             double semanticsF1Threshold,
             int k) {
-        if (!usesLinkageAttackMetric(privacyMetricChoice)) {
-            throw new IllegalArgumentException("LCL flow problem requires a linkage-attack privacy metric");
-        }
         this.inputCsvPath = inputCsvPath;
         this.privacyMetricChoice = privacyMetricChoice;
         this.semanticsF1Threshold = semanticsF1Threshold;
@@ -76,11 +75,19 @@ public class LclFlowStreamAnonymizationProblem implements
         this.querySettings = LclFlowAllFieldsMainQuery.Settings.defaults()
                 .withInstrumentationRange(minTimestamp, maxTimestamp);
         this.baselineOutcome = LclFlowAllFieldsMainQuery.process(this.inputTuples, "main", querySettings);
-        this.linkageAttackPrivacy = new LinkageAttackPrivacy(
-                this.inputTuples,
-                k,
-                LINKAGE_ATTACK_QUASI_IDENTIFIER_ATTRIBUTES,
-                LINKAGE_ATTACK_QUASI_IDENTIFIER_TYPES);
+        this.kAnonymityPrivacy = usesKAnonymityMetric(privacyMetricChoice)
+                ? new KAnonymityPrivacyCardinality(
+                        this.inputTuples,
+                        k,
+                        List.of(Tuple.getFieldNames(this.inputTuples.get(0).getNumFields())))
+                : null;
+        this.linkageAttackPrivacy = usesLinkageAttackMetric(privacyMetricChoice)
+                ? new LinkageAttackPrivacy(
+                        this.inputTuples,
+                        k,
+                        LINKAGE_ATTACK_QUASI_IDENTIFIER_ATTRIBUTES,
+                        LINKAGE_ATTACK_QUASI_IDENTIFIER_TYPES)
+                : null;
         this.fidelitySimilarity = new StreamFlowSnapshotSimilarity(baselineOutcome.flow());
     }
 
@@ -131,10 +138,13 @@ public class LclFlowStreamAnonymizationProblem implements
 
     private double privacyScore(List<Tuple> modifiedEvents) {
         return switch (privacyMetricChoice) {
-            case LINKAGE_ATTACK_EXPECTED_SUCCESS -> linkageAttackPrivacy.applyExpectedSuccess(modifiedEvents);
-            case LINKAGE_ATTACK_TOP_K_CONTAINMENT -> linkageAttackPrivacy.applyTopKContainment(modifiedEvents);
-            default -> throw new IllegalStateException(
-                    "Unsupported privacy metric for LCL flow: " + privacyMetricChoice);
+            case K_ANONYMITY_CARDINALITY -> requireKAnonymityPrivacy().apply(inputTuples, modifiedEvents);
+            case K_ANONYMITY_CARDINALITY_MAX -> requireKAnonymityPrivacy().applyWithMax(inputTuples, modifiedEvents);
+            case K_ANONYMITY_CARDINALITY_Q99 -> requireKAnonymityPrivacy().applyWithQuantile99(
+                    inputTuples,
+                    modifiedEvents);
+            case LINKAGE_ATTACK_EXPECTED_SUCCESS -> requireLinkageAttackPrivacy().applyExpectedSuccess(modifiedEvents);
+            case LINKAGE_ATTACK_TOP_K_CONTAINMENT -> requireLinkageAttackPrivacy().applyTopKContainment(modifiedEvents);
         };
     }
 
@@ -149,5 +159,26 @@ public class LclFlowStreamAnonymizationProblem implements
             case LINKAGE_ATTACK_EXPECTED_SUCCESS, LINKAGE_ATTACK_TOP_K_CONTAINMENT -> true;
             case K_ANONYMITY_CARDINALITY, K_ANONYMITY_CARDINALITY_MAX, K_ANONYMITY_CARDINALITY_Q99 -> false;
         };
+    }
+
+    private static boolean usesKAnonymityMetric(PrivacyMetricChoice privacyMetricChoice) {
+        return switch (privacyMetricChoice) {
+            case K_ANONYMITY_CARDINALITY, K_ANONYMITY_CARDINALITY_MAX, K_ANONYMITY_CARDINALITY_Q99 -> true;
+            case LINKAGE_ATTACK_EXPECTED_SUCCESS, LINKAGE_ATTACK_TOP_K_CONTAINMENT -> false;
+        };
+    }
+
+    private KAnonymityPrivacyCardinality requireKAnonymityPrivacy() {
+        if (kAnonymityPrivacy == null) {
+            throw new IllegalStateException("K-anonymity privacy is not initialized for " + privacyMetricChoice);
+        }
+        return kAnonymityPrivacy;
+    }
+
+    private LinkageAttackPrivacy requireLinkageAttackPrivacy() {
+        if (linkageAttackPrivacy == null) {
+            throw new IllegalStateException("Linkage-attack privacy is not initialized for " + privacyMetricChoice);
+        }
+        return linkageAttackPrivacy;
     }
 }
