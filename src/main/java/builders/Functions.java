@@ -45,6 +45,7 @@ public class Functions {
    * bit 4 = MapAggregate
    * bit 5 = Fork or ConditionalFork
    * bit 6 = MapTimestampPairwiseSwap
+   * bit 7 = MapTimestampGroupShuffle
    *
    * Source, Sink, and Union are structural nodes and do not contribute to the bitmap.
    *
@@ -166,6 +167,9 @@ public class Functions {
     }
     if (node instanceof QueryMapper.MapTimestampPairwiseSwap) {
       return 1 << 6;
+    }
+    if (node instanceof QueryMapper.MapTimestampGroupShuffle) {
+      return 1 << 7;
     }
     return 0;
   }

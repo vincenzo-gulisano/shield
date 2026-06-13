@@ -66,6 +66,10 @@ public class LiebreAnonymizationQueryFromGraph {
                     operators.put(m.getID(),
                             query.addOperator(new FlushableFlatMapOperator<>(m.getID(), m.createMapFunction())));
                 }
+                case mappers.QueryMapper.MapTimestampGroupShuffle m -> {
+                    operators.put(m.getID(),
+                            query.addOperator(new FlushableFlatMapOperator<>(m.getID(), m.createMapFunction())));
+                }
                 case mappers.QueryMapper.Fork f -> {
                     operators.put(f.getID(), query.addRouterOperator(f.getID()));
                     // operators.put(f.getID(),

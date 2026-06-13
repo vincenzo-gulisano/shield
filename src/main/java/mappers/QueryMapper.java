@@ -45,6 +45,7 @@ import query.utils.MapAggregateFunction;
 import query.utils.MapDuplicateFunction;
 import query.utils.MapNoiseFunction;
 import query.utils.RIRMap;
+import query.utils.TimestampGroupFieldShuffleFunction;
 import query.utils.TimestampPairwiseFieldSwapFunction;
 import usecase.common.FieldValueSampler;
 import usecase.common.Tuple;
@@ -214,6 +215,13 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
             parseMapTimestampPairwiseSwapNode(specificOpNode, id),
             previousNode, g);
       }
+      case "<map_timestamp_group_shuffle>", "<map_timestamp_group_shuffle_nominal>",
+          "<map_timestamp_group_shuffle_discrete_numeric>", "<map_timestamp_group_shuffle_continuous_numeric>" -> {
+        String id = "MTG" + operatorCounters.merge("MapTimestampGroupShuffle", 1, Integer::sum);
+        return addSimpleOperatorStepToGraph(
+            parseMapTimestampGroupShuffleNode(specificOpNode, id),
+            previousNode, g);
+      }
       case "<fork_ops_join>" -> {
         return parseForkJoinNode(specificOpNode, previousNode, g, operatorCounters);
       }
@@ -321,6 +329,10 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
 
   private OperatorRepresentation parseMapTimestampPairwiseSwapNode(Tree<String> specificOpNode, String id) {
     return new MapTimestampPairwiseSwap(id, parseTokenNode(specificOpNode.child(0)).replace("'", ""));
+  }
+
+  private OperatorRepresentation parseMapTimestampGroupShuffleNode(Tree<String> specificOpNode, String id) {
+    return new MapTimestampGroupShuffle(id, parseTokenNode(specificOpNode.child(0)).replace("'", ""));
   }
 
   private OperatorRepresentation parseForkJoinNode(Tree<String> specificOpNode,
@@ -438,7 +450,9 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
           "<map_rir_continuous_numeric>", "<map_aggregate>", "<map_aggregate_discrete_numeric>",
           "<map_aggregate_continuous_numeric>", "<map_timestamp_pairwise_swap>",
           "<map_timestamp_pairwise_swap_nominal>", "<map_timestamp_pairwise_swap_discrete_numeric>",
-          "<map_timestamp_pairwise_swap_continuous_numeric>", "<fork_ops_join>", "<fork_discrete_numeric>",
+          "<map_timestamp_pairwise_swap_continuous_numeric>", "<map_timestamp_group_shuffle>",
+          "<map_timestamp_group_shuffle_nominal>", "<map_timestamp_group_shuffle_discrete_numeric>",
+          "<map_timestamp_group_shuffle_continuous_numeric>", "<fork_ops_join>", "<fork_discrete_numeric>",
           "<fork_continuous_numeric>", "<fork_nominal>" -> true;
       default -> false;
     };
@@ -472,6 +486,9 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     }
     if (node instanceof QueryMapper.MapTimestampPairwiseSwap mapTimestampPairwiseSwap) {
       return mapTimestampPairwiseSwap.field();
+    }
+    if (node instanceof QueryMapper.MapTimestampGroupShuffle mapTimestampGroupShuffle) {
+      return mapTimestampGroupShuffle.field();
     }
     if (node instanceof QueryMapper.ConditionalFork conditionalFork) {
       return conditionalFork.field();
@@ -512,8 +529,8 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
   }
 
   public sealed interface OperatorRepresentation
-      permits FilterOperator, MapDuplicate, MapNoise, MapRIR, MapAggregate, MapTimestampPairwiseSwap, Fork,
-      ConditionalFork, Union, Source, Sink {
+      permits FilterOperator, MapDuplicate, MapNoise, MapRIR, MapAggregate, MapTimestampPairwiseSwap,
+      MapTimestampGroupShuffle, Fork, ConditionalFork, Union, Source, Sink {
     public String getID();
   }
 
@@ -615,6 +632,18 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     }
   }
 
+  public record MapTimestampGroupShuffle(String id, String field) implements OperatorRepresentation {
+    @Override
+    public String getID() {
+      return id;
+    }
+
+    public TimestampGroupFieldShuffleFunction createMapFunction() {
+      return new TimestampGroupFieldShuffleFunction(
+          field, deterministicSeed("MapTimestampGroupShuffle", id, field));
+    }
+  }
+
   public record Fork(String id) implements OperatorRepresentation {
     @Override
     public String getID() {
@@ -713,6 +742,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
       case "MapRIR" -> parseMapRIRFromString(representation);
       case "MapAggregate" -> parseMapAggregateFromString(representation);
       case "MapTimestampPairwiseSwap" -> parseMapTimestampPairwiseSwapFromString(representation);
+      case "MapTimestampGroupShuffle" -> parseMapTimestampGroupShuffleFromString(representation);
       case "Fork" -> parseForkFromString(representation);
       case "ConditionalFork" -> parseConditionalForkFromString(representation);
       case "Union" -> parseUnionFromString(representation);
@@ -767,6 +797,13 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
   public static MapTimestampPairwiseSwap parseMapTimestampPairwiseSwapFromString(String representation) {
     Map<String, String> params = parseOperatorParams(representation, "MapTimestampPairwiseSwap");
     return new MapTimestampPairwiseSwap(
+        requiredParam(params, "id", representation),
+        requiredParam(params, "field", representation));
+  }
+
+  public static MapTimestampGroupShuffle parseMapTimestampGroupShuffleFromString(String representation) {
+    Map<String, String> params = parseOperatorParams(representation, "MapTimestampGroupShuffle");
+    return new MapTimestampGroupShuffle(
         requiredParam(params, "id", representation),
         requiredParam(params, "field", representation));
   }

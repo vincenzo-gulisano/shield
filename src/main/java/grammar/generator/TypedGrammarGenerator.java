@@ -137,18 +137,21 @@ public final class TypedGrammarGenerator {
             operatorRules.add("<map_noise_nominal>");
             operatorRules.add("<map_rir_nominal>");
             operatorRules.add("<map_timestamp_pairwise_swap_nominal>");
+            operatorRules.add("<map_timestamp_group_shuffle_nominal>");
         }
         if (has(fieldsByType, FieldType.DISCRETE_NUMERIC)) {
             operatorRules.add("<map_noise_discrete_numeric>");
             operatorRules.add("<map_rir_discrete_numeric>");
             operatorRules.add("<map_aggregate_discrete_numeric>");
             operatorRules.add("<map_timestamp_pairwise_swap_discrete_numeric>");
+            operatorRules.add("<map_timestamp_group_shuffle_discrete_numeric>");
         }
         if (has(fieldsByType, FieldType.CONTINUOUS_NUMERIC)) {
             operatorRules.add("<map_noise_continuous_numeric>");
             operatorRules.add("<map_rir_continuous_numeric>");
             operatorRules.add("<map_aggregate_continuous_numeric>");
             operatorRules.add("<map_timestamp_pairwise_swap_continuous_numeric>");
+            operatorRules.add("<map_timestamp_group_shuffle_continuous_numeric>");
         }
         if (options.includeConditionalForks()) {
             if (has(fieldsByType, FieldType.DISCRETE_NUMERIC)) {
@@ -186,18 +189,21 @@ public final class TypedGrammarGenerator {
             grammar.append("<map_noise_nominal> ::= <nominal_attribute> <probability>\n");
             grammar.append("<map_rir_nominal> ::= <nominal_attribute>\n");
             grammar.append("<map_timestamp_pairwise_swap_nominal> ::= <nominal_attribute>\n");
+            grammar.append("<map_timestamp_group_shuffle_nominal> ::= <nominal_attribute>\n");
         }
         if (has(fieldsByType, FieldType.DISCRETE_NUMERIC)) {
             grammar.append("<map_noise_discrete_numeric> ::= <discrete_numeric_attribute> <percentage>\n");
             grammar.append("<map_rir_discrete_numeric> ::= <discrete_numeric_attribute>\n");
             grammar.append("<map_aggregate_discrete_numeric> ::= <discrete_numeric_attribute> <numeric_agg_fun> <window_size>\n");
             grammar.append("<map_timestamp_pairwise_swap_discrete_numeric> ::= <discrete_numeric_attribute>\n");
+            grammar.append("<map_timestamp_group_shuffle_discrete_numeric> ::= <discrete_numeric_attribute>\n");
         }
         if (has(fieldsByType, FieldType.CONTINUOUS_NUMERIC)) {
             grammar.append("<map_noise_continuous_numeric> ::= <continuous_numeric_attribute> <percentage>\n");
             grammar.append("<map_rir_continuous_numeric> ::= <continuous_numeric_attribute>\n");
             grammar.append("<map_aggregate_continuous_numeric> ::= <continuous_numeric_attribute> <numeric_agg_fun> <window_size>\n");
             grammar.append("<map_timestamp_pairwise_swap_continuous_numeric> ::= <continuous_numeric_attribute>\n");
+            grammar.append("<map_timestamp_group_shuffle_continuous_numeric> ::= <continuous_numeric_attribute>\n");
         }
         if (options.includeConditionalForks()) {
             if (has(fieldsByType, FieldType.DISCRETE_NUMERIC)) {
