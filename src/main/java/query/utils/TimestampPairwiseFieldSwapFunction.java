@@ -33,6 +33,10 @@ public class TimestampPairwiseFieldSwapFunction implements FlushableFlatMapFunct
             return List.of();
         }
 
+        if (current.getTimestamp() < bufferedTuple.getTimestamp()) {
+            throw new IllegalArgumentException("TimestampPairwiseFieldSwapFunction requires non-decreasing timestamps");
+        }
+
         if (bufferedTuple.getTimestamp() == current.getTimestamp()) {
             Tuple first = new Tuple(bufferedTuple);
             Tuple second = new Tuple(current);

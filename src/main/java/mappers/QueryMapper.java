@@ -103,22 +103,19 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
       throw new IllegalArgumentException("Previous node cannot be null when parsing a <pipeline> node");
     }
 
+    if (pipelineNode.nChildren() == 1 && isPipelineNode(pipelineNode.child(0).content())) {
+      return parsePipelineNode(pipelineNode.child(0), previousNode, g, operatorCounters);
+    }
+
     if (pipelineNode.nChildren() > 2) {
       throw new IllegalArgumentException(
-          "A <pipeline> node can have at most 2 children: an <operator> and an optional <pipeline>");
+          "A pipeline node can have at most 2 children: an operator and an optional pipeline");
     }
 
-    // List<OperatorRepresentation> steps = new ArrayList<>();
-
-    // Search for the two possible child node of a <pipeline> node: <operator> or
-    // another <pipeline>
     Tree<String> operatorNode = pipelineNode.child(0);
-    if (!operatorNode.content().equals("<operator>")) {
-      throw new IllegalArgumentException("The first child of a <pipeline> node must be an <operator> node");
-    }
     Tree<String> nextPipelineNode = pipelineNode.nChildren() > 1 ? pipelineNode.child(1) : null;
-    if (nextPipelineNode != null && !nextPipelineNode.content().equals("<pipeline>")) {
-      throw new IllegalArgumentException("The second child of a <pipeline> node must be a <pipeline> node");
+    if (nextPipelineNode != null && !isPipelineNode(nextPipelineNode.content())) {
+      throw new IllegalArgumentException("The second child of a pipeline node must be a pipeline node");
     }
 
     OperatorRepresentation step = parseOperatorNode(operatorNode, previousNode, g, operatorCounters);
@@ -139,7 +136,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
 
   private OperatorRepresentation parseOperatorNode(Tree<String> operatorNode, OperatorRepresentation previousNode,
       Graph<OperatorRepresentation, ArcType> g, Map<String, Integer> operatorCounters) {
-    Tree<String> specificOpNode = operatorNode.child(0);
+    Tree<String> specificOpNode = unwrapOperatorNode(operatorNode);
 
     switch (specificOpNode.content()) {
       case "<filter>", "<filter_discrete_numeric>", "<filter_continuous_numeric>", "<filter_nominal>" -> {
@@ -225,7 +222,9 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
       case "<fork_ops_join>" -> {
         return parseForkJoinNode(specificOpNode, previousNode, g, operatorCounters);
       }
-      case "<fork_discrete_numeric>", "<fork_continuous_numeric>", "<fork_nominal>" -> {
+      case "<fork_discrete_numeric>", "<fork_continuous_numeric>", "<fork_nominal>",
+          "<fork_discrete_numeric_sorted>", "<fork_continuous_numeric_sorted>", "<fork_nominal_sorted>",
+          "<fork_discrete_numeric_unsorted>", "<fork_continuous_numeric_unsorted>", "<fork_nominal_unsorted>" -> {
         return parseConditionalForkJoinNode(specificOpNode, previousNode, g, operatorCounters);
       }
       default ->
@@ -342,9 +341,9 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
       throw new IllegalArgumentException(
           "A <fork_ops_join> node must have exactly 2 children, representing the two branches of the fork");
     }
-    if (!specificOpNode.child(0).content().equals("<pipeline>")
-        || !specificOpNode.child(1).content().equals("<pipeline>")) {
-      throw new IllegalArgumentException("The children of a <fork_ops_join> node must be <pipeline> nodes");
+    if (!isPipelineNode(specificOpNode.child(0).content())
+        || !isPipelineNode(specificOpNode.child(1).content())) {
+      throw new IllegalArgumentException("The children of a <fork_ops_join> node must be pipeline nodes");
     }
 
     Tree<String> leftPipelineNode = specificOpNode.child(0);
@@ -377,10 +376,10 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
       throw new IllegalArgumentException(
           specificOpNode.content() + " must have a field, condition, value, and two <pipeline> children");
     }
-    if (!specificOpNode.child(3).content().equals("<pipeline>")
-        || !specificOpNode.child(4).content().equals("<pipeline>")) {
+    if (!isPipelineNode(specificOpNode.child(3).content())
+        || !isPipelineNode(specificOpNode.child(4).content())) {
       throw new IllegalArgumentException("The last two children of " + specificOpNode.content()
-          + " must be <pipeline> nodes");
+          + " must be pipeline nodes");
     }
 
     String field = parseTokenNode(specificOpNode.child(0));
@@ -417,7 +416,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
 
   private static void appendTreeOperators(StringBuilder sb, Tree<String> node, int level) {
     String content = node.content();
-    if (content.equals("<pipeline>") || content.equals("<operator>")) {
+    if (isPipelineNode(content) || isOperatorWrapperNode(content)) {
       for (Tree<String> child : node) {
         appendTreeOperators(sb, child, level);
       }
@@ -453,9 +452,39 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
           "<map_timestamp_pairwise_swap_continuous_numeric>", "<map_timestamp_group_shuffle>",
           "<map_timestamp_group_shuffle_nominal>", "<map_timestamp_group_shuffle_discrete_numeric>",
           "<map_timestamp_group_shuffle_continuous_numeric>", "<fork_ops_join>", "<fork_discrete_numeric>",
-          "<fork_continuous_numeric>", "<fork_nominal>" -> true;
+          "<fork_continuous_numeric>", "<fork_nominal>", "<fork_discrete_numeric_sorted>",
+          "<fork_continuous_numeric_sorted>", "<fork_nominal_sorted>", "<fork_discrete_numeric_unsorted>",
+          "<fork_continuous_numeric_unsorted>", "<fork_nominal_unsorted>" -> true;
       default -> false;
     };
+  }
+
+  private static boolean isPipelineNode(String content) {
+    return content.equals("<pipeline>")
+        || content.equals("<sorted_pipeline>")
+        || content.equals("<unsorted_pipeline>");
+  }
+
+  private static boolean isOperatorWrapperNode(String content) {
+    return content.equals("<operator>")
+        || content.equals("<sorted_operator>")
+        || content.equals("<unsorted_operator>")
+        || content.equals("<ordinary_operator>")
+        || content.equals("<timestamp_sensitive_operator>")
+        || content.equals("<sorted_fork>")
+        || content.equals("<unsorted_fork>");
+  }
+
+  private static Tree<String> unwrapOperatorNode(Tree<String> operatorNode) {
+    Tree<String> current = operatorNode;
+    while (!isOperatorNode(current.content())) {
+      if (current.nChildren() != 1) {
+        throw new IllegalArgumentException("Expected operator node or unary operator wrapper, got: "
+            + current.content());
+      }
+      current = current.child(0);
+    }
+    return current;
   }
 
   private static String operatorName(String content) {
