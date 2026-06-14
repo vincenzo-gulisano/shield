@@ -475,17 +475,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     g.addNode(forkOp);
     g.setArcValue(previousNode, forkOp, ArcType.DEFAULT_ARC);
 
-    OperatorRepresentation leftBranch = parsePipelineNode(leftPipelineNode, forkOp, g, operatorCounters);
-    OperatorRepresentation rightBranch = parsePipelineNode(rightPipelineNode, forkOp, g, operatorCounters);
-
-    String unionId = "U" + operatorCounters.merge("Union", 1, Integer::sum);
-
-    OperatorRepresentation joinOp = new Union(unionId);
-    g.addNode(joinOp);
-    g.setArcValue(leftBranch, joinOp, ArcType.DEFAULT_ARC);
-    g.setArcValue(rightBranch, joinOp, ArcType.DEFAULT_ARC);
-
-    return joinOp;
+    return parseBranchPipelinesAndJoin(leftPipelineNode, rightPipelineNode, forkOp, g, operatorCounters);
 
   }
 
@@ -512,16 +502,8 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     g.addNode(forkOp);
     g.setArcValue(previousNode, forkOp, ArcType.DEFAULT_ARC);
 
-    OperatorRepresentation leftBranch = parsePipelineNode(specificOpNode.child(3), forkOp, g, operatorCounters);
-    OperatorRepresentation rightBranch = parsePipelineNode(specificOpNode.child(4), forkOp, g, operatorCounters);
-
-    String unionId = "U" + operatorCounters.merge("Union", 1, Integer::sum);
-    OperatorRepresentation joinOp = new Union(unionId);
-    g.addNode(joinOp);
-    g.setArcValue(leftBranch, joinOp, ArcType.DEFAULT_ARC);
-    g.setArcValue(rightBranch, joinOp, ArcType.DEFAULT_ARC);
-
-    return joinOp;
+    return parseBranchPipelinesAndJoin(
+        specificOpNode.child(3), specificOpNode.child(4), forkOp, g, operatorCounters);
   }
 
   private OperatorRepresentation parseQueryConditionForkJoinNode(Tree<String> specificOpNode,
@@ -542,14 +524,44 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     g.addNode(forkOp);
     g.setArcValue(previousNode, forkOp, ArcType.DEFAULT_ARC);
 
-    OperatorRepresentation leftBranch = parsePipelineNode(specificOpNode.child(1), forkOp, g, operatorCounters);
-    OperatorRepresentation rightBranch = parsePipelineNode(specificOpNode.child(2), forkOp, g, operatorCounters);
+    return parseBranchPipelinesAndJoin(
+        specificOpNode.child(1), specificOpNode.child(2), forkOp, g, operatorCounters);
+  }
+
+  private OperatorRepresentation parseBranchPipelinesAndJoin(
+      Tree<String> leftPipelineNode,
+      Tree<String> rightPipelineNode,
+      OperatorRepresentation forkOp,
+      Graph<OperatorRepresentation, ArcType> g,
+      Map<String, Integer> operatorCounters) {
+    if (isEmptyPipelineNode(leftPipelineNode) && isEmptyPipelineNode(rightPipelineNode)) {
+      throw new IllegalArgumentException("A fork cannot have two empty branches");
+    }
 
     String unionId = "U" + operatorCounters.merge("Union", 1, Integer::sum);
     OperatorRepresentation joinOp = new Union(unionId);
     g.addNode(joinOp);
-    g.setArcValue(leftBranch, joinOp, ArcType.DEFAULT_ARC);
-    g.setArcValue(rightBranch, joinOp, ArcType.DEFAULT_ARC);
+
+    OperatorRepresentation leftBranch = null;
+    if (isEmptyPipelineNode(leftPipelineNode)) {
+      g.setArcValue(forkOp, joinOp, ArcType.DEFAULT_ARC);
+    } else {
+      leftBranch = parsePipelineNode(leftPipelineNode, forkOp, g, operatorCounters);
+    }
+
+    OperatorRepresentation rightBranch = null;
+    if (isEmptyPipelineNode(rightPipelineNode)) {
+      g.setArcValue(forkOp, joinOp, ArcType.DEFAULT_ARC);
+    } else {
+      rightBranch = parsePipelineNode(rightPipelineNode, forkOp, g, operatorCounters);
+    }
+
+    if (leftBranch != null) {
+      g.setArcValue(leftBranch, joinOp, ArcType.DEFAULT_ARC);
+    }
+    if (rightBranch != null) {
+      g.setArcValue(rightBranch, joinOp, ArcType.DEFAULT_ARC);
+    }
 
     return joinOp;
   }
@@ -622,6 +634,10 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
         || content.equals("<sorted_pipeline>")
         || content.equals("<unsorted_pipeline>")
         || content.equals("<empty_pipeline>");
+  }
+
+  private static boolean isEmptyPipelineNode(Tree<String> node) {
+    return node.content().equals("<empty_pipeline>");
   }
 
   private static boolean isOperatorWrapperNode(String content) {

@@ -1,7 +1,9 @@
 package usecase.lcl.flow;
 
 import io.github.ericmedvet.jgea.core.representation.graph.Graph;
+import io.github.ericmedvet.jgea.core.representation.graph.Graph.Arc;
 import io.github.ericmedvet.jgea.core.representation.graph.LinkedHashGraph;
+import io.github.ericmedvet.jgea.core.representation.tree.Tree;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
@@ -23,12 +25,15 @@ public final class LclFlowContributorConditionSmokeTest {
         require(contributorCount < input.size(), "Contributor condition should not match every tuple");
 
         Graph<QueryMapper.OperatorRepresentation, ArcType> graph = graph();
+        assertContributorForkDirectBranchFirst(graph);
         assertContributorBranchIsUnchanged(input,
                 new LiebreAnonymizationQueryFromGraph().processAnonymizationQuery(graph, input));
 
-        Graph<QueryMapper.OperatorRepresentation, ArcType> parsedGraph = QueryMapper.parseGraphFromString("{nodes=[Source[id=source], QueryConditionFork[id=QCF1, conditionId=c_lcl_flow_contributor], MapConditionPartitionShuffle[id=MCGS1, field=f4, conditionId=c_f1_eq_0], MapConditionPairwiseSwap[id=MCPS1, field=f10, conditionId=c_f2_ge_1_0], MapConditionPartitionShuffle[id=MCGS2, field=f6, conditionId=c_f1_eq_0], MapConditionPairwiseSwap[id=MCPS2, field=f7, conditionId=c_f11_lt_45], Union[id=U1], Sink[id=sink]], arcs={Source[id=source]->QueryConditionFork[id=QCF1, conditionId=c_lcl_flow_contributor]=DEFAULT_ARC, QueryConditionFork[id=QCF1, conditionId=c_lcl_flow_contributor]->MapConditionPartitionShuffle[id=MCGS1, field=f4, conditionId=c_f1_eq_0]=DEFAULT_ARC, MapConditionPartitionShuffle[id=MCGS1, field=f4, conditionId=c_f1_eq_0]->MapConditionPairwiseSwap[id=MCPS1, field=f10, conditionId=c_f2_ge_1_0]=DEFAULT_ARC, MapConditionPairwiseSwap[id=MCPS1, field=f10, conditionId=c_f2_ge_1_0]->MapConditionPartitionShuffle[id=MCGS2, field=f6, conditionId=c_f1_eq_0]=DEFAULT_ARC, MapConditionPartitionShuffle[id=MCGS2, field=f6, conditionId=c_f1_eq_0]->MapConditionPairwiseSwap[id=MCPS2, field=f7, conditionId=c_f11_lt_45]=DEFAULT_ARC, QueryConditionFork[id=QCF1, conditionId=c_lcl_flow_contributor]->Union[id=U1]=DEFAULT_ARC, MapConditionPairwiseSwap[id=MCPS2, field=f7, conditionId=c_f11_lt_45]->Union[id=U1]=DEFAULT_ARC, Union[id=U1]->Sink[id=sink]=DEFAULT_ARC}}");
+        Graph<QueryMapper.OperatorRepresentation, ArcType> treeMappedGraph =
+                new QueryMapper().mapperFor(new LinkedHashGraph<>()).apply(contributorRootTree());
+        assertContributorForkDirectBranchFirst(treeMappedGraph);
         assertContributorBranchIsUnchanged(input,
-                new LiebreAnonymizationQueryFromGraph().processAnonymizationQuery(parsedGraph, input));
+                new LiebreAnonymizationQueryFromGraph().processAnonymizationQuery(treeMappedGraph, input));
 
         System.out.printf("lclFlowContributorCondition contributors=%d total=%d%n", contributorCount, input.size());
         System.exit(0);
@@ -56,6 +61,29 @@ public final class LclFlowContributorConditionSmokeTest {
         graph.setArcValue(nonContributorNoise, union, ArcType.DEFAULT_ARC);
         graph.setArcValue(union, sink, ArcType.DEFAULT_ARC);
         return graph;
+    }
+
+    private static Tree<String> contributorRootTree() {
+        return tree("<pipeline>",
+                tree("<contributor_root>",
+                        tree(LclFlowContributorCondition.CONDITION_ID),
+                        tree("<empty_pipeline>", tree("noop")),
+                        tree("<sorted_pipeline>",
+                                tree("<ordinary_operator>",
+                                        tree("<map_condition_preserving_noise_continuous_numeric>",
+                                                tree("f8"),
+                                                tree("0.25"),
+                                                tree("c_f2_ge_1_0"))))));
+    }
+
+    private static void assertContributorForkDirectBranchFirst(Graph<QueryMapper.OperatorRepresentation, ArcType> graph) {
+        List<Arc<QueryMapper.OperatorRepresentation>> branchArcs = graph.arcs().stream()
+                .filter(arc -> arc.source() instanceof QueryMapper.QueryConditionFork fork
+                        && fork.conditionId().equals(LclFlowContributorCondition.CONDITION_ID))
+                .toList();
+        require(branchArcs.size() == 2, "Expected two outgoing arcs from the contributor fork");
+        require(branchArcs.getFirst().target() instanceof QueryMapper.Union,
+                "Contributor true branch should be the direct union branch");
     }
 
     private static void assertContributorBranchIsUnchanged(List<Tuple> input, List<Tuple> output) {
@@ -97,5 +125,10 @@ public final class LclFlowContributorConditionSmokeTest {
         if (!condition) {
             throw new IllegalStateException(message);
         }
+    }
+
+    @SafeVarargs
+    private static Tree<String> tree(String content, Tree<String>... children) {
+        return Tree.of(content, List.of(children));
     }
 }
