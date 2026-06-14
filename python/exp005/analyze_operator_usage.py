@@ -10,11 +10,15 @@ from pathlib import Path
 
 
 OPERATOR_RE = re.compile(
-    r"\b(ConditionalFork|FilterOperator|MapAggregate|MapRIR|MapNoise|"
+    r"\b(QueryConditionFork|ConditionalFork|FilterQueryCondition|FilterOperator|MapAggregate|"
+    r"MapConditionPreservingRIR|MapConditionPreservingNoise|MapRIR|MapNoise|"
+    r"MapConditionPartitionShuffle|MapConditionPairwiseSwap|"
     r"MapTimestampGroupShuffle|MapTimestampPairwiseSwap|MapDuplicate|Union|Sink|Source)\[id="
 )
 FIELD_RE = re.compile(
-    r"(ConditionalFork|FilterOperator|MapAggregate|MapRIR|MapNoise|"
+    r"(QueryConditionFork|ConditionalFork|FilterQueryCondition|FilterOperator|MapAggregate|"
+    r"MapConditionPreservingRIR|MapConditionPreservingNoise|MapRIR|MapNoise|"
+    r"MapConditionPartitionShuffle|MapConditionPairwiseSwap|"
     r"MapTimestampGroupShuffle|MapTimestampPairwiseSwap|MapDuplicate)\[id=[^\]]+?field=(f\d+)"
 )
 
