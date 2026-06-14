@@ -1,14 +1,22 @@
 package query.utils;
 
 import usecase.common.Tuple;
+import usecase.lcl.flow.LclFlowContributorCondition;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Predicate;
 
 import static query.utils.OperatorUtils.requireFinite;
 
-public record TupleConditionSpec(String id, String field, Operator operator, double value, double upperValue) {
+public record TupleConditionSpec(
+        String id,
+        String field,
+        Operator operator,
+        double value,
+        double upperValue,
+        Predicate<Tuple> customPredicate) {
 
     public enum Operator {
         GE,
@@ -17,23 +25,42 @@ public record TupleConditionSpec(String id, String field, Operator operator, dou
         LT,
         EQ,
         NEQ,
-        BETWEEN_CLOSED
+        BETWEEN_CLOSED,
+        CUSTOM
     }
 
     public TupleConditionSpec {
         Objects.requireNonNull(id, "id");
-        Objects.requireNonNull(field, "field");
         Objects.requireNonNull(operator, "operator");
-        requireFinite(field, value);
-        if (operator == Operator.BETWEEN_CLOSED) {
-            requireFinite(field, upperValue);
-            if (upperValue < value) {
-                throw new IllegalArgumentException("upperValue cannot be lower than value");
+        if (operator == Operator.CUSTOM) {
+            Objects.requireNonNull(customPredicate, "customPredicate");
+        } else {
+            Objects.requireNonNull(field, "field");
+            requireFinite(field, value);
+            if (operator == Operator.BETWEEN_CLOSED) {
+                requireFinite(field, upperValue);
+                if (upperValue < value) {
+                    throw new IllegalArgumentException("upperValue cannot be lower than value");
+                }
             }
         }
     }
 
+    public TupleConditionSpec(String id, String field, Operator operator, double value, double upperValue) {
+        this(id, field, operator, value, upperValue, null);
+    }
+
     public static TupleConditionSpec fromId(String id) {
+        if (LclFlowContributorCondition.CONDITION_ID.equals(id)) {
+            return new TupleConditionSpec(
+                    id,
+                    null,
+                    Operator.CUSTOM,
+                    Double.NaN,
+                    Double.NaN,
+                    LclFlowContributorCondition::isContributor);
+        }
+
         String[] parts = Objects.requireNonNull(id, "id").split("_");
         if (parts.length < 4 || !parts[0].equals("c")) {
             throw new IllegalArgumentException(
@@ -57,6 +84,9 @@ public record TupleConditionSpec(String id, String field, Operator operator, dou
     }
 
     public boolean test(Tuple tuple) {
+        if (operator == Operator.CUSTOM) {
+            return customPredicate.test(tuple);
+        }
         double tupleValue = requireFinite(field, tuple.lookup(field));
         return switch (operator) {
             case GE -> tupleValue >= value;
@@ -66,6 +96,7 @@ public record TupleConditionSpec(String id, String field, Operator operator, dou
             case EQ -> Double.compare(tupleValue, value) == 0;
             case NEQ -> Double.compare(tupleValue, value) != 0;
             case BETWEEN_CLOSED -> tupleValue >= value && tupleValue <= upperValue;
+            case CUSTOM -> throw new IllegalStateException("Custom condition should have been handled before switch");
         };
     }
 

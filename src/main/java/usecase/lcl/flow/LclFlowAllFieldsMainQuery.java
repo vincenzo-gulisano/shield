@@ -181,7 +181,7 @@ public final class LclFlowAllFieldsMainQuery {
         return new QueryResult(List.copyOf(outputTuples), instrumentation.snapshot());
     }
 
-    private static double stdDailyLoadRisk(Tuple tuple, Settings settings) {
+    static double stdDailyLoadRisk(Tuple tuple, Settings settings) {
         return 0.22d * capRatio(tuple.getField("f2"), STD_DAILY_KWH_REF)
                 + 0.18d * capRatio(tuple.getField("f3"), STD_MAX_30_MIN_REF)
                 + 0.12d * capRatio(tuple.getField("f4"), STD_MEDIAN_30_MIN_REF)
@@ -194,7 +194,7 @@ public final class LclFlowAllFieldsMainQuery {
                 + 0.04d * capRatio(tuple.getField("f11"), STD_ZERO_HALF_HOUR_REF);
     }
 
-    private static double touEveningPeakRisk(Tuple tuple, Settings settings) {
+    static double touEveningPeakRisk(Tuple tuple, Settings settings) {
         return 0.16d * capRatio(tuple.getField("f2"), TOU_DAILY_KWH_REF)
                 + 0.12d * capRatio(tuple.getField("f3"), TOU_MAX_30_MIN_REF)
                 + 0.08d * capRatio(tuple.getField("f4"), TOU_MEDIAN_30_MIN_REF)

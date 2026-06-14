@@ -108,6 +108,9 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     if (previousNode == null) {
       throw new IllegalArgumentException("Previous node cannot be null when parsing a <pipeline> node");
     }
+    if (pipelineNode.content().equals("<empty_pipeline>")) {
+      return previousNode;
+    }
 
     if (pipelineNode.nChildren() == 1 && isPipelineNode(pipelineNode.child(0).content())) {
       return parsePipelineNode(pipelineNode.child(0), previousNode, g, operatorCounters);
@@ -284,7 +287,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
       case "<fork_ops_join>" -> {
         return parseForkJoinNode(specificOpNode, previousNode, g, operatorCounters);
       }
-      case "<query_condition_fork_sorted>", "<query_condition_fork_unsorted>" -> {
+      case "<contributor_root>", "<query_condition_fork_sorted>", "<query_condition_fork_unsorted>" -> {
         return parseQueryConditionForkJoinNode(specificOpNode, previousNode, g, operatorCounters);
       }
       case "<fork_discrete_numeric>", "<fork_continuous_numeric>", "<fork_nominal>",
@@ -606,7 +609,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
           "<map_condition_pairwise_swap_discrete_numeric>", "<map_condition_pairwise_swap_continuous_numeric>",
           "<map_condition_partition_shuffle_nominal>", "<map_condition_partition_shuffle_discrete_numeric>",
           "<map_condition_partition_shuffle_continuous_numeric>", "<fork_ops_join>", "<fork_discrete_numeric>",
-          "<fork_continuous_numeric>", "<fork_nominal>", "<fork_discrete_numeric_sorted>",
+          "<fork_continuous_numeric>", "<fork_nominal>", "<contributor_root>", "<fork_discrete_numeric_sorted>",
           "<fork_continuous_numeric_sorted>", "<fork_nominal_sorted>", "<fork_discrete_numeric_unsorted>",
           "<fork_continuous_numeric_unsorted>", "<fork_nominal_unsorted>", "<query_condition_fork_sorted>",
           "<query_condition_fork_unsorted>" -> true;
@@ -617,7 +620,8 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
   private static boolean isPipelineNode(String content) {
     return content.equals("<pipeline>")
         || content.equals("<sorted_pipeline>")
-        || content.equals("<unsorted_pipeline>");
+        || content.equals("<unsorted_pipeline>")
+        || content.equals("<empty_pipeline>");
   }
 
   private static boolean isOperatorWrapperNode(String content) {
