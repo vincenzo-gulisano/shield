@@ -50,13 +50,22 @@ public class LiebreAnonymizationQueryFromGraph {
                 case mappers.QueryMapper.FilterOperator f -> {
                     operators.put(f.getID(), query.addFilterOperator(f.getID(), f.createFilterFunction()));
                 }
+                case mappers.QueryMapper.FilterQueryCondition f -> {
+                    operators.put(f.getID(), query.addFilterOperator(f.getID(), f.createFilterFunction()));
+                }
                 case mappers.QueryMapper.MapDuplicate m -> {
                     operators.put(m.getID(), query.addFlatMapOperator(m.getID(), m.createMapFunction()));
                 }
                 case mappers.QueryMapper.MapNoise m -> {
                     operators.put(m.getID(), query.addMapOperator(m.getID(), m.createMapFunction()));
                 }
+                case mappers.QueryMapper.MapConditionPreservingNoise m -> {
+                    operators.put(m.getID(), query.addMapOperator(m.getID(), m.createMapFunction()));
+                }
                 case mappers.QueryMapper.MapRIR m -> {
+                    operators.put(m.getID(), query.addMapOperator(m.getID(), m.createRIRMap()));
+                }
+                case mappers.QueryMapper.MapConditionPreservingRIR m -> {
                     operators.put(m.getID(), query.addMapOperator(m.getID(), m.createRIRMap()));
                 }
                 case mappers.QueryMapper.MapAggregate m -> {
@@ -67,6 +76,14 @@ public class LiebreAnonymizationQueryFromGraph {
                             query.addOperator(new FlushableFlatMapOperator<>(m.getID(), m.createMapFunction())));
                 }
                 case mappers.QueryMapper.MapTimestampGroupShuffle m -> {
+                    operators.put(m.getID(),
+                            query.addOperator(new FlushableFlatMapOperator<>(m.getID(), m.createMapFunction())));
+                }
+                case mappers.QueryMapper.MapConditionPairwiseSwap m -> {
+                    operators.put(m.getID(),
+                            query.addOperator(new FlushableFlatMapOperator<>(m.getID(), m.createMapFunction())));
+                }
+                case mappers.QueryMapper.MapConditionPartitionShuffle m -> {
                     operators.put(m.getID(),
                             query.addOperator(new FlushableFlatMapOperator<>(m.getID(), m.createMapFunction())));
                 }
@@ -82,6 +99,9 @@ public class LiebreAnonymizationQueryFromGraph {
                     // }));
                 }
                 case mappers.QueryMapper.ConditionalFork f -> {
+                    operators.put(f.getID(), query.addOperator(f.createRouterOperator()));
+                }
+                case mappers.QueryMapper.QueryConditionFork f -> {
                     operators.put(f.getID(), query.addOperator(f.createRouterOperator()));
                 }
                 case mappers.QueryMapper.Union u -> {
@@ -128,7 +148,8 @@ public class LiebreAnonymizationQueryFromGraph {
         // HashMap<>();
         Map<OperatorRepresentation, List<Arc<OperatorRepresentation>>> conditionalForkArcs = new LinkedHashMap<>();
         for (Arc<OperatorRepresentation> arc : g.arcs()) {
-            if (arc.source() instanceof mappers.QueryMapper.ConditionalFork) {
+            if (arc.source() instanceof mappers.QueryMapper.ConditionalFork
+                    || arc.source() instanceof mappers.QueryMapper.QueryConditionFork) {
                 conditionalForkArcs.computeIfAbsent(arc.source(), ignored -> new ArrayList<>()).add(arc);
                 continue;
             }

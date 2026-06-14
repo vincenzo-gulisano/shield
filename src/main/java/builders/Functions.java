@@ -46,6 +46,11 @@ public class Functions {
    * bit 5 = Fork or ConditionalFork
    * bit 6 = MapTimestampPairwiseSwap
    * bit 7 = MapTimestampGroupShuffle
+   * bit 8 = FilterQueryCondition
+   * bit 9 = MapConditionPreservingNoise
+   * bit 10 = MapConditionPreservingRIR
+   * bit 11 = MapConditionPairwiseSwap
+   * bit 12 = MapConditionPartitionShuffle
    *
    * Source, Sink, and Union are structural nodes and do not contribute to the bitmap.
    *
@@ -72,7 +77,8 @@ public class Functions {
     Function<Graph<N, A>, Integer> f = g -> {
       int count = 0;
       for (N node : g.nodes()) {
-        if (node instanceof QueryMapper.Fork || node instanceof QueryMapper.ConditionalFork) {
+        if (node instanceof QueryMapper.Fork || node instanceof QueryMapper.ConditionalFork
+            || node instanceof QueryMapper.QueryConditionFork) {
           count++;
         }
       }
@@ -89,7 +95,7 @@ public class Functions {
       boolean hasFilter = false;
       boolean hasDuplicate = false;
       for (N node : g.nodes()) {
-        hasFilter |= node instanceof QueryMapper.FilterOperator;
+        hasFilter |= node instanceof QueryMapper.FilterOperator || node instanceof QueryMapper.FilterQueryCondition;
         hasDuplicate |= node instanceof QueryMapper.MapDuplicate;
       }
       return (hasFilter ? 1 : 0) + (hasDuplicate ? 2 : 0);
@@ -104,7 +110,7 @@ public class Functions {
     Function<Graph<N, A>, Integer> f = g -> {
       int count = 0;
       for (N node : g.nodes()) {
-        if (node instanceof QueryMapper.FilterOperator) {
+        if (node instanceof QueryMapper.FilterOperator || node instanceof QueryMapper.FilterQueryCondition) {
           count++;
         }
       }
@@ -162,7 +168,8 @@ public class Functions {
     if (node instanceof QueryMapper.MapAggregate) {
       return 1 << 4;
     }
-    if (node instanceof QueryMapper.Fork || node instanceof QueryMapper.ConditionalFork) {
+    if (node instanceof QueryMapper.Fork || node instanceof QueryMapper.ConditionalFork
+        || node instanceof QueryMapper.QueryConditionFork) {
       return 1 << 5;
     }
     if (node instanceof QueryMapper.MapTimestampPairwiseSwap) {
@@ -170,6 +177,21 @@ public class Functions {
     }
     if (node instanceof QueryMapper.MapTimestampGroupShuffle) {
       return 1 << 7;
+    }
+    if (node instanceof QueryMapper.FilterQueryCondition) {
+      return 1 << 8;
+    }
+    if (node instanceof QueryMapper.MapConditionPreservingNoise) {
+      return 1 << 9;
+    }
+    if (node instanceof QueryMapper.MapConditionPreservingRIR) {
+      return 1 << 10;
+    }
+    if (node instanceof QueryMapper.MapConditionPairwiseSwap) {
+      return 1 << 11;
+    }
+    if (node instanceof QueryMapper.MapConditionPartitionShuffle) {
+      return 1 << 12;
     }
     return 0;
   }
