@@ -44,6 +44,9 @@ public final class LclFlowMainQuery {
 
         StreamFlowInstrumentation instrumentation =
                 new StreamFlowInstrumentation(instrumentationMinTimestamp, instrumentationMaxTimestamp, settings.timeBins());
+
+        // TODO if you are trying to get a provenance version of this query, make sure all new operators work correctly!
+
         Query query = new Query(
                 new BasicLiebreScheduler(),
                 new InstrumentedStreamFactory(new BackoffStreamFactory(), instrumentation),

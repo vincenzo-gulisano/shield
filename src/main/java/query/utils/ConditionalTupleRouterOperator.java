@@ -1,7 +1,10 @@
 package query.utils;
 
 import component.operator.in1.filter.FilterFunction;
+import component.operator.Operator;
 import component.operator.router.BaseRouterOperator;
+import experimental.provenance.ProvenanceTransformableOperator;
+import experimental.provenance.ProvenanceTransformationContext;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -15,7 +18,8 @@ import usecase.common.Tuple;
  * non-matching tuples. The mapper/query builder is responsible for connecting outputs in that order.
  */
 @SuppressWarnings("unchecked")
-public class ConditionalTupleRouterOperator extends BaseRouterOperator<Tuple> {
+public class ConditionalTupleRouterOperator extends BaseRouterOperator<Tuple>
+        implements ProvenanceTransformableOperator {
 
     private final FilterFunction<Tuple> condition;
 
@@ -35,5 +39,10 @@ public class ConditionalTupleRouterOperator extends BaseRouterOperator<Tuple> {
                     "Conditional router requires exactly two outputs, found " + outputs.size());
         }
         return List.of(condition.test(tuple) ? outputs.get(0) : outputs.get(1));
+    }
+
+    @Override
+    public Operator<?, ?> createProvenanceOperator(ProvenanceTransformationContext context) {
+        return new ConditionalTupleRouterOperator(getId(), condition);
     }
 }

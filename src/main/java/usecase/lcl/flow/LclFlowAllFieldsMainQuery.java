@@ -4,7 +4,10 @@ import common.util.backoff.InactiveBackoff;
 import component.operator.Operator;
 import component.sink.Sink;
 import component.source.Source;
+import experimental.provenance.ProvenanceQueryTransformer;
+import experimental.provenance.UIDFactory;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import query.LiebreContext;
@@ -81,7 +84,51 @@ public final class LclFlowAllFieldsMainQuery {
                 new InstrumentedStreamFactory(new BackoffStreamFactory(), instrumentation),
                 settings.streamCapacity());
         query.setBackoff(1, 1, 1);
+        BuiltQuery builtQuery = buildQuery(query, inputStream, queryId, settings);
 
+        runUntilSinksFinish(query, builtQuery.sinks(), settings.maxWaitMillis(), "LCL all-fields flow query");
+
+        return new QueryResult(List.copyOf(builtQuery.outputTuples()), instrumentation.snapshot());
+    }
+
+    public static ProvenanceQueryResult processWithProvenance(List<Tuple> inputStream, String queryId) {
+        return processWithProvenance(inputStream, queryId, Settings.defaults());
+    }
+
+    public static ProvenanceQueryResult processWithProvenance(
+            List<Tuple> inputStream,
+            String queryId,
+            Settings settings) {
+        if (inputStream == null || inputStream.isEmpty()) {
+            throw new IllegalArgumentException("inputStream cannot be null or empty");
+        }
+        Query original = new Query(settings.streamCapacity());
+        original.setBackoff(1, 1, 1);
+        BuiltQuery builtQuery = buildQuery(original, inputStream, queryId, settings);
+        boolean uidsWereEnabled = UIDFactory.INSTANCE.isUIDsEnabled();
+        if (!uidsWereEnabled) {
+            UIDFactory.INSTANCE.enableUIDs();
+        }
+        try {
+            Query provenanceQuery = new ProvenanceQueryTransformer().transform(original);
+            runUntilSinksFinish(
+                    provenanceQuery,
+                    provenanceQuery.sinks(),
+                    settings.maxWaitMillis(),
+                    "LCL all-fields provenance query");
+            return new ProvenanceQueryResult(List.copyOf(builtQuery.outputTuples()));
+        } finally {
+            if (!uidsWereEnabled) {
+                UIDFactory.INSTANCE.disableUIDs();
+            }
+        }
+    }
+
+    private static BuiltQuery buildQuery(
+            Query query,
+            List<Tuple> inputStream,
+            String queryId,
+            Settings settings) {
         List<Tuple> outputTuples = Collections.synchronizedList(new ArrayList<>());
 
         // Source: replay one daily tuple per household/day from the prepared LCL flow dataset.
@@ -159,15 +206,22 @@ public final class LclFlowAllFieldsMainQuery {
                 .connect(touAlertSummary, touCountFilter)
                 .connect(touCountFilter, touSink, InactiveBackoff.INSTANCE);
 
+        return new BuiltQuery(outputTuples, List.of(stdSink, touSink));
+    }
+
+    private static void runUntilSinksFinish(
+            Query query,
+            Collection<? extends Sink<?>> sinks,
+            long maxWaitMillis,
+            String description) {
         query.activate();
-        long deadlineMillis = settings.maxWaitMillis() <= 0L
+        long deadlineMillis = maxWaitMillis <= 0L
                 ? Long.MAX_VALUE
-                : System.currentTimeMillis() + settings.maxWaitMillis();
-        while (stdSink.isEnabled() || touSink.isEnabled()) {
+                : System.currentTimeMillis() + maxWaitMillis;
+        while (sinks.stream().anyMatch(Sink::isEnabled)) {
             if (System.currentTimeMillis() > deadlineMillis) {
                 query.deActivate();
-                throw new IllegalStateException(
-                        "LCL all-fields flow query did not finish within " + settings.maxWaitMillis() + " ms");
+                throw new IllegalStateException(description + " did not finish within " + maxWaitMillis + " ms");
             }
             try {
                 Thread.sleep(1L);
@@ -177,8 +231,6 @@ public final class LclFlowAllFieldsMainQuery {
             }
         }
         query.deActivate();
-
-        return new QueryResult(List.copyOf(outputTuples), instrumentation.snapshot());
     }
 
     static double stdDailyLoadRisk(Tuple tuple, Settings settings) {
@@ -225,6 +277,9 @@ public final class LclFlowAllFieldsMainQuery {
 
     private static Tuple withKey(Tuple tuple, String key) {
         return new Tuple(tuple.getStimulus(), tuple.getTimestamp(), key, tuple.getFields());
+    }
+
+    private record BuiltQuery(List<Tuple> outputTuples, List<Sink<Tuple>> sinks) {
     }
 
     public record Settings(
@@ -296,5 +351,8 @@ public final class LclFlowAllFieldsMainQuery {
     }
 
     public record QueryResult(List<Tuple> outputTuples, StreamFlowInstrumentation.Snapshot flow) {
+    }
+
+    public record ProvenanceQueryResult(List<Tuple> outputTuples) {
     }
 }

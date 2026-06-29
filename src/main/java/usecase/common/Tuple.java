@@ -2,10 +2,10 @@ package usecase.common;
 
 import java.util.stream.IntStream;
 
-import common.tuple.BaseRichTuple;
+import experimental.provenance.GenealogTuple;
 import metrics.privacy.DoubleFieldLookup;
 
-public class Tuple extends BaseRichTuple implements DoubleFieldLookup {
+public class Tuple extends GenealogTuple implements DoubleFieldLookup {
 
     private final double[] fs;
     private final Long linkageId;

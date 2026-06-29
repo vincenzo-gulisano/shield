@@ -1,7 +1,9 @@
 package usecase.lcl.flow;
 
+import experimental.provenance.ProvenanceTransformationContext;
 import java.util.List;
 import query.utils.FlushableFlatMapFunction;
+import query.utils.ProvenanceAwareFlushableFlatMapFunction;
 import usecase.common.Tuple;
 
 /**
@@ -28,8 +30,10 @@ import usecase.common.Tuple;
  *     <li>{@code f7}: average severity score.</li>
  * </ul>
  */
-final class SameTimestampAlertSummaryFunction implements FlushableFlatMapFunction<Tuple, Tuple> {
+final class SameTimestampAlertSummaryFunction implements ProvenanceAwareFlushableFlatMapFunction<Tuple, Tuple> {
 
+    private final ProvenanceTransformationContext provenanceContext;
+    private ProvenanceTransformationContext.TupleChain currentChain;
     private long currentTimestamp;
     private String currentKey;
     private double tariff;
@@ -40,6 +44,19 @@ final class SameTimestampAlertSummaryFunction implements FlushableFlatMapFunctio
     private double loadFactorSum;
     private double severitySum;
     private boolean hasCurrentGroup;
+
+    SameTimestampAlertSummaryFunction() {
+        this(null);
+    }
+
+    private SameTimestampAlertSummaryFunction(ProvenanceTransformationContext provenanceContext) {
+        this.provenanceContext = provenanceContext;
+    }
+
+    @Override
+    public FlushableFlatMapFunction<Tuple, Tuple> createProvenanceFunction(ProvenanceTransformationContext context) {
+        return new SameTimestampAlertSummaryFunction(context);
+    }
 
     @Override
     public List<Tuple> apply(Tuple in) {
@@ -98,6 +115,7 @@ final class SameTimestampAlertSummaryFunction implements FlushableFlatMapFunctio
         eveningShareSum = 0d;
         loadFactorSum = 0d;
         severitySum = 0d;
+        currentChain = provenanceContext == null ? null : provenanceContext.newTupleChain();
         hasCurrentGroup = true;
         add(tuple);
     }
@@ -105,6 +123,9 @@ final class SameTimestampAlertSummaryFunction implements FlushableFlatMapFunctio
     private void add(Tuple tuple) {
         // The query has already filtered this tuple as an alert candidate. Here we only accumulate
         // branch-level daily statistics; no additional alert logic is applied in this function.
+        if (currentChain != null) {
+            currentChain.append(tuple);
+        }
         count++;
         dailyKwhSum += tuple.getField("f2");
         max30MinSum += tuple.getField("f3");
@@ -116,7 +137,7 @@ final class SameTimestampAlertSummaryFunction implements FlushableFlatMapFunctio
     private Tuple emitCurrentGroup() {
         // The output is a compact day/tariff alert tuple. The downstream count filter reads f2,
         // while semantic comparison sees the whole tuple as the observable alert output.
-        return new Tuple(
+        Tuple out = new Tuple(
                 currentTimestamp,
                 currentKey,
                 tariff,
@@ -126,6 +147,10 @@ final class SameTimestampAlertSummaryFunction implements FlushableFlatMapFunctio
                 eveningShareSum / count,
                 loadFactorSum / count,
                 severitySum / count);
+        if (provenanceContext != null && currentChain != null && !currentChain.isEmpty()) {
+            provenanceContext.markAggregate(out, currentChain.first(), currentChain.last());
+        }
+        return out;
     }
 
     private double severity(Tuple tuple) {
@@ -144,6 +169,7 @@ final class SameTimestampAlertSummaryFunction implements FlushableFlatMapFunctio
         eveningShareSum = 0d;
         loadFactorSum = 0d;
         severitySum = 0d;
+        currentChain = null;
         hasCurrentGroup = false;
     }
 }

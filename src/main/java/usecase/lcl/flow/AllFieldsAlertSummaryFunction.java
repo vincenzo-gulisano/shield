@@ -1,9 +1,11 @@
 package usecase.lcl.flow;
 
+import experimental.provenance.ProvenanceTransformationContext;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.ToDoubleFunction;
 import query.utils.FlushableFlatMapFunction;
+import query.utils.ProvenanceAwareFlushableFlatMapFunction;
 import usecase.common.Tuple;
 
 /**
@@ -18,12 +20,14 @@ import usecase.common.Tuple;
  * synthetic branch risk score. This makes anonymization changes to any input field more likely to
  * affect the main-query output.
  */
-final class AllFieldsAlertSummaryFunction implements FlushableFlatMapFunction<Tuple, Tuple> {
+final class AllFieldsAlertSummaryFunction implements ProvenanceAwareFlushableFlatMapFunction<Tuple, Tuple> {
 
     private static final int SUMMED_INPUT_FIELDS = 10;
 
     private final ToDoubleFunction<Tuple> scoreFunction;
+    private final ProvenanceTransformationContext provenanceContext;
     private final double[] featureSums;
+    private ProvenanceTransformationContext.TupleChain currentChain;
     private long currentTimestamp;
     private String currentKey;
     private double tariff;
@@ -32,11 +36,23 @@ final class AllFieldsAlertSummaryFunction implements FlushableFlatMapFunction<Tu
     private boolean hasCurrentGroup;
 
     AllFieldsAlertSummaryFunction(ToDoubleFunction<Tuple> scoreFunction) {
+        this(scoreFunction, null);
+    }
+
+    private AllFieldsAlertSummaryFunction(
+            ToDoubleFunction<Tuple> scoreFunction,
+            ProvenanceTransformationContext provenanceContext) {
         if (scoreFunction == null) {
             throw new IllegalArgumentException("scoreFunction cannot be null");
         }
         this.scoreFunction = scoreFunction;
+        this.provenanceContext = provenanceContext;
         this.featureSums = new double[SUMMED_INPUT_FIELDS];
+    }
+
+    @Override
+    public FlushableFlatMapFunction<Tuple, Tuple> createProvenanceFunction(ProvenanceTransformationContext context) {
+        return new AllFieldsAlertSummaryFunction(scoreFunction, context);
     }
 
     @Override
@@ -91,11 +107,15 @@ final class AllFieldsAlertSummaryFunction implements FlushableFlatMapFunction<Tu
         count = 0L;
         scoreSum = 0d;
         Arrays.fill(featureSums, 0d);
+        currentChain = provenanceContext == null ? null : provenanceContext.newTupleChain();
         hasCurrentGroup = true;
         add(tuple);
     }
 
     private void add(Tuple tuple) {
+        if (currentChain != null) {
+            currentChain.append(tuple);
+        }
         count++;
         for (int i = 0; i < SUMMED_INPUT_FIELDS; i++) {
             featureSums[i] += tuple.getField("f" + (i + 2));
@@ -111,7 +131,11 @@ final class AllFieldsAlertSummaryFunction implements FlushableFlatMapFunction<Tu
             fields[i + 2] = featureSums[i] / count;
         }
         fields[12] = scoreSum / count;
-        return new Tuple(currentTimestamp, currentKey, fields);
+        Tuple out = new Tuple(currentTimestamp, currentKey, fields);
+        if (provenanceContext != null && currentChain != null && !currentChain.isEmpty()) {
+            provenanceContext.markAggregate(out, currentChain.first(), currentChain.last());
+        }
+        return out;
     }
 
     private void reset() {
@@ -121,6 +145,7 @@ final class AllFieldsAlertSummaryFunction implements FlushableFlatMapFunction<Tu
         count = 0L;
         scoreSum = 0d;
         Arrays.fill(featureSums, 0d);
+        currentChain = null;
         hasCurrentGroup = false;
     }
 }
