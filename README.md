@@ -177,7 +177,7 @@ java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 10 -f expe
 
 ##### If you want to debug:
 
-* `java -agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=localhost:5005 -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 10 -f synthetic.forkjoin.txt`
+* `java -agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=localhost:5005 -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 10 -f experiment.txt`
 
 * Modify the launch.json (VS Code) and add
 ```

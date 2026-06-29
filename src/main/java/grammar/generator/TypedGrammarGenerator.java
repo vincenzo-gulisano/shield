@@ -60,7 +60,7 @@ public final class TypedGrammarGenerator {
         }
 
         /**
-         * Default choices matching the existing NHANES grammar style where possible.
+         * Default choices for typed grammars.
          */
         public static Options defaults() {
             return new Options(

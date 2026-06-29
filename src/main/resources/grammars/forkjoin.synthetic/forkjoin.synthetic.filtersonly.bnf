@@ -1,7 +1,0 @@
-<pipeline> ::= <operator> | <operator> <pipeline>
-<operator> ::= <filter>
-<filter> ::= <attribute> <condition> <value>
-<attribute> ::= f1 | f2
-<condition> ::= lt | gt
-<value> ::= <dig> <dig> <dig> <dig> <dig> <dig> . <dig> <dig>
-<dig> ::= 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9

@@ -19,14 +19,12 @@ package builders;
 import io.github.ericmedvet.jnb.core.Cacheable;
 import io.github.ericmedvet.jnb.core.Discoverable;
 import io.github.ericmedvet.jnb.core.Param;
-import problem.EnhancedStreamAnonymizationProblem;
 import problem.StreamAnonymizationProblem;
 import problem.StreamAnonymizationProblem_2ObjectivesPerf;
 import problem.StreamAnonymizationProblem_2ObjectivesRes;
 import problem.utils.PrivacyMetricChoice;
 import usecase.lcl.LclStreamAnonymizationProblem;
 import usecase.lcl.flow.LclFlowStreamAnonymizationProblem;
-import usecase.nhanes.NhanesStreamAnonymizationProblem;
 
 @Discoverable(prefixTemplate = "anonym.problem")
 public class Problems {
@@ -45,32 +43,6 @@ public class Problems {
             @Param(value = "name", iS = "{inputCsvPath}") String name) throws Exception {
         boolean isFilterOnly = grammarPath.toLowerCase().contains("filters");
         return new StreamAnonymizationProblem(inputCsvPath, keyColumn, privacyMetric, isFilterOnly);
-    }
-
-    @Cacheable
-    public static EnhancedStreamAnonymizationProblem enhancedStreamAnonymizationProblem(
-            @Param("inputCsvPath") String inputCsvPath,
-            @Param(value = "privacyMetric", dS = "K_ANONYMITY_CARDINALITY") PrivacyMetricChoice privacyMetric,
-            @Param(value = "name", iS = "{inputCsvPath}") String name) {
-
-        return new EnhancedStreamAnonymizationProblem(inputCsvPath, privacyMetric);
-    }
-
-    @Cacheable
-    public static NhanesStreamAnonymizationProblem nhanesStreamAnonymizationProblem(
-            @Param("inputCsvPath") String inputCsvPath,
-            @Param(value = "privacyMetric", dS = "K_ANONYMITY_CARDINALITY") PrivacyMetricChoice privacyMetric,
-            @Param(value = "fidelityF1Threshold", dD = 0.05) double fidelityF1Threshold,
-            @Param(value = "semanticsF1Threshold", dD = 0.05) double semanticsF1Threshold,
-            @Param(value = "k", dI = 50) int k,
-            @Param(value = "name", iS = "{inputCsvPath}") String name) {
-
-        return new NhanesStreamAnonymizationProblem(
-                inputCsvPath,
-                privacyMetric,
-                fidelityF1Threshold,
-                semanticsF1Threshold,
-                k);
     }
 
     @Cacheable
@@ -103,19 +75,6 @@ public class Problems {
                 privacyMetric,
                 semanticsF1Threshold,
                 k);
-    }
-
-    // Create a problem with 3 objectives
-    @SuppressWarnings("unused")
-    @Cacheable
-    public static StreamAnonymizationProblem medicalDataAnonymizationProblem(
-            @Param("inputCsvPath") String inputCsvPath,
-            @Param("grammarPath") String grammarPath,
-            @Param(value = "privacyMetric", dS = "K_ANONYMITY_CARDINALITY") PrivacyMetricChoice privacyMetric,
-            @Param(value = "keyColumn", dS = "") String keyColumn,
-            @Param(value = "name", iS = "{inputCsvPath}") String name) throws Exception {
-        boolean isFilterOnly = grammarPath.toLowerCase().contains("filters");
-        return new StreamAnonymizationProblem(inputCsvPath, keyColumn, privacyMetric, isFilterOnly);
     }
 
     // Create a problem with 2 objectives: results similarity and privacy
