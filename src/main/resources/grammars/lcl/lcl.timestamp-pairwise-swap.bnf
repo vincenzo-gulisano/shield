@@ -1,4 +1,0 @@
-<pipeline> ::= <operator> | <operator> <pipeline>
-<operator> ::= <map_timestamp_pairwise_swap_continuous_numeric>
-<map_timestamp_pairwise_swap_continuous_numeric> ::= <continuous_numeric_attribute>
-<continuous_numeric_attribute> ::= f1 | f2 | f3
