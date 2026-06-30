@@ -7,6 +7,7 @@ import grammar.generator.TypedGrammarGenerator.PipelineMode;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -36,25 +37,25 @@ public final class LclFlowExistingGrammarSmokeTest {
     }
 
     public static void main(String[] args) throws IOException {
-        Map<String, String> generated = Map.of(
-                "lcl.flow.complete.bnf",
-                TypedGrammarGenerator.generate(LCL_FIELDS, completeOptions()),
-                "lcl.flow.timestamp-group-shuffle.bnf",
-                TypedGrammarGenerator.generate(
-                        LCL_FIELDS,
-                        Options.timestampAwareDefaults().withSortedOperatorWrappers(true)),
-                "lcl.flow.typed-aggregate-sampled-values.bnf",
-                TypedGrammarGenerator.generate(LCL_FIELDS, typedAggregateSampledValuesOptions()),
-                "lcl.flow.query-aware.bnf",
-                TypedGrammarGenerator.generate(LCL_FIELDS, Options.queryConditionAwareDefaults()),
-                "lcl.flow.optional-provenance-fork-all-ops.bnf",
-                TypedGrammarGenerator.generate(LCL_FIELDS, Options.queryConditionAwareAllOperatorsDefaults()),
-                "lcl.flow.contributor-fork-both-branches-all-ops.bnf",
-                TypedGrammarGenerator.generate(
-                        LCL_FIELDS,
-                        Options.queryConditionAwareAllOperatorsDefaults().withContributorRoot()),
-                "lcl.flow.old-aggregate-old-values.bnf",
-                oldAggregateOldValuesGrammar());
+        Map<String, String> generated = new LinkedHashMap<>();
+        generated.put("lcl.flow.complete.bnf", TypedGrammarGenerator.generate(LCL_FIELDS, completeOptions()));
+        generated.put("lcl.flow.timestamp-group-shuffle.bnf", timestampAwareDagGrammar());
+        generated.put("lcl.flow.typed-aggregate-sampled-values.bnf",
+                TypedGrammarGenerator.generate(LCL_FIELDS, typedAggregateSampledValuesOptions()));
+        generated.put("lcl.flow.query-aware.bnf",
+                TypedGrammarGenerator.generate(LCL_FIELDS, Options.queryConditionAwareDefaults()));
+        generated.put("lcl.flow.optional-provenance-fork-all-ops.bnf",
+                TypedGrammarGenerator.generate(LCL_FIELDS, Options.queryConditionAwareAllOperatorsDefaults()));
+        generated.put("lcl.flow.contributor-fork-both-branches-all-ops.bnf", provenanceAwareDagGrammar());
+        generated.put("lcl.flow.old-aggregate-old-values.bnf", oldAggregateOldValuesGrammar());
+        generated.put("lcl.flow.01.bnf", oldAggregateOldValuesGrammar());
+        generated.put("lcl.flow.02.bnf", oldAggregateOldValuesGrammar());
+        generated.put("lcl.flow.03.bnf", timestampAwareDagGrammar());
+        generated.put("lcl.flow.04.bnf", timestampAwareDagGrammar());
+        generated.put("lcl.flow.05.bnf", pipelineProvenanceControlGrammar());
+        generated.put("lcl.flow.06.bnf", pipelineProvenanceControlGrammar());
+        generated.put("lcl.flow.07.bnf", provenanceAwareDagGrammar());
+        generated.put("lcl.flow.08.bnf", provenanceAwareDagGrammar());
 
         for (Map.Entry<String, String> entry : generated.entrySet()) {
             assertMatches(entry.getKey(), entry.getValue());
@@ -110,6 +111,18 @@ public final class LclFlowExistingGrammarSmokeTest {
                 NOMINAL_VALUES);
     }
 
+    private static String timestampAwareDagGrammar() {
+        return TypedGrammarGenerator.generate(
+                LCL_FIELDS,
+                Options.timestampAwareDefaults().withSortedOperatorWrappers(true));
+    }
+
+    private static String provenanceAwareDagGrammar() {
+        return TypedGrammarGenerator.generate(
+                LCL_FIELDS,
+                Options.queryConditionAwareAllOperatorsDefaults().withContributorRoot());
+    }
+
     private static void assertMatches(String grammarFile, String generatedGrammar) throws IOException {
         String existingGrammar = Files.readString(LCL_GRAMMAR_DIR.resolve(grammarFile));
         if (!existingGrammar.equals(generatedGrammar)) {
@@ -146,6 +159,28 @@ public final class LclFlowExistingGrammarSmokeTest {
                 "<map_aggregate> ::= <attribute> <agg_fun> <window_size>",
                 "<attribute> ::= f1 | f2 | f3 | f4 | f5 | f6 | f7 | f8 | f9 | f10 | f11",
                 "<condition> ::= lt | gt",
+                "<value> ::= <dig> . <dig> <dig> E <sign> <dig>",
+                "<dig> ::= 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9",
+                "<sign> ::= + | -",
+                "<agg_fun> ::= min | avg | max",
+                "<window_size> ::= 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10",
+                "<probability> ::= 0.1 | 0.2 | 0.3 | 0.4 | 0.5 | 0.6 | 0.7 | 0.8 | 0.9 | 1.0",
+                "<percentage> ::= 0.01 | 0.05 | 0.10 | 0.25")
+                + "\n";
+    }
+
+    private static String pipelineProvenanceControlGrammar() {
+        return String.join("\n",
+                "<pipeline> ::= <operator> | <operator> <pipeline>",
+                "<operator> ::= <filter> | <filter_query_condition> | <map_duplicate> | <map_noise> | <map_aggregate>",
+                "<filter> ::= <attribute> <condition> <value>",
+                "<filter_query_condition> ::= <condition_keep>",
+                "<map_duplicate> ::= <probability>",
+                "<map_noise> ::= <attribute> <percentage>",
+                "<map_aggregate> ::= <attribute> <agg_fun> <window_size>",
+                "<attribute> ::= f1 | f2 | f3 | f4 | f5 | f6 | f7 | f8 | f9 | f10 | f11",
+                "<condition> ::= lt | gt",
+                "<condition_keep> ::= keep_true | keep_false",
                 "<value> ::= <dig> . <dig> <dig> E <sign> <dig>",
                 "<dig> ::= 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9",
                 "<sign> ::= + | -",
