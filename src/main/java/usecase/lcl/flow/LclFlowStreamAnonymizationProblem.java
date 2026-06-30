@@ -74,6 +74,7 @@ public class LclFlowStreamAnonymizationProblem implements
         long maxTimestamp = this.inputTuples.stream().mapToLong(Tuple::getTimestamp).max().orElseThrow();
         this.querySettings = LclFlowAllFieldsMainQuery.Settings.defaults()
                 .withInstrumentationRange(minTimestamp, maxTimestamp);
+        LclFlowContributorCondition.initializeFromProvenance(this.inputTuples, querySettings);
         this.baselineOutcome = LclFlowAllFieldsMainQuery.process(this.inputTuples, "main", querySettings);
         this.kAnonymityPrivacy = usesKAnonymityMetric(privacyMetricChoice)
                 ? new KAnonymityPrivacyCardinality(

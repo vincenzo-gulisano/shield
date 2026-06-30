@@ -81,11 +81,14 @@ public final class LclFlowProvenanceSmokeTest {
             }
         }
         require(finalTimestampOutputs > 0, "Expected provenance for final flushed timestamp outputs");
+        LclFlowContributorCondition.initializeFromProvenance(
+                input,
+                LclFlowAllFieldsMainQuery.Settings.defaults());
         require(
                 provenanceContributorLinkageIds.equals(LclFlowContributorCondition.contributorLinkageIds()),
-                "Transformed provenance contributors differ from ad-hoc contributors: transformed="
+                "Transformed provenance contributors differ from cached contributor condition: transformed="
                         + provenanceContributorLinkageIds.size()
-                        + " adHoc="
+                        + " condition="
                         + LclFlowContributorCondition.contributorCount());
 
         System.out.printf(

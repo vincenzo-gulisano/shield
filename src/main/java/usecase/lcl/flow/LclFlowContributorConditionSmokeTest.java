@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import mappers.QueryMapper;
 import mappers.QueryMapper.ArcType;
+import problem.utils.PrivacyMetricChoice;
 import query.LiebreAnonymizationQueryFromGraph;
 import usecase.common.Tuple;
 
@@ -20,6 +21,11 @@ public final class LclFlowContributorConditionSmokeTest {
 
     public static void main(String[] args) throws IOException {
         List<Tuple> input = LclFlowTupleReader.loadUnchecked(LclFlowTupleReader.DEFAULT_RESOURCE);
+        new LclFlowStreamAnonymizationProblem(
+                LclFlowTupleReader.DEFAULT_RESOURCE,
+                PrivacyMetricChoice.LINKAGE_ATTACK_TOP_K_CONTAINMENT,
+                0.02d,
+                20);
         int contributorCount = LclFlowContributorCondition.contributorCount();
         require(contributorCount > 0, "Expected at least one contributor tuple");
         require(contributorCount < input.size(), "Contributor condition should not match every tuple");

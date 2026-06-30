@@ -1,82 +1,84 @@
 package usecase.lcl.flow;
 
-import java.util.LinkedHashMap;
+import experimental.provenance.GenealogTraverser;
+import experimental.provenance.GenealogTuple;
+import experimental.provenance.GenealogTupleType;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import usecase.common.Tuple;
 
 /**
- * Hardcoded LCL-flow condition used by the contributor-fork experiment.
+ * Provenance-backed LCL-flow condition used by the contributor-fork experiment.
  *
- * <p>A tuple is marked as a contributor if, in the baseline LCL-flow query, the tuple passes the
- * active-day filter, passes the corresponding tariff alert filter, and belongs to a day/tariff
- * alert group that survives the final count filter. The condition is intentionally keyed by the
- * tuple linkage id, so it identifies the original input records that contribute to semantic
- * outputs.
+ * <p>A tuple is marked as a contributor if the provenance-transformed baseline LCL-flow query shows
+ * that the tuple contributes to any final semantic output. The condition is keyed by tuple linkage
+ * id, so it identifies original input records independently of later anonymization copies.
  */
 public final class LclFlowContributorCondition {
 
     public static final String CONDITION_ID = "c_lcl_flow_contributor";
 
-    private static final Set<Long> CONTRIBUTOR_LINKAGE_IDS = computeContributorLinkageIds();
+    private static volatile Set<Long> contributorLinkageIds;
 
     private LclFlowContributorCondition() {
     }
 
+    public static void initializeFromProvenance(
+            List<Tuple> inputTuples,
+            LclFlowAllFieldsMainQuery.Settings querySettings) {
+        if (inputTuples == null || inputTuples.isEmpty()) {
+            throw new IllegalArgumentException("inputTuples cannot be null or empty");
+        }
+        List<Tuple> provenanceInput = inputTuples.stream().map(Tuple::new).toList();
+        LclFlowAllFieldsMainQuery.ProvenanceQueryResult provenance =
+                LclFlowAllFieldsMainQuery.processWithProvenance(
+                        provenanceInput,
+                        "lcl-flow-contributor-condition",
+                        querySettings);
+        contributorLinkageIds = sourceContributorLinkageIds(provenance.outputTuples());
+    }
+
     public static boolean isContributor(Tuple tuple) {
+        Set<Long> contributors = requireInitialized();
         return tuple != null
                 && tuple.hasLinkageId()
-                && CONTRIBUTOR_LINKAGE_IDS.contains(tuple.getLinkageId());
+                && contributors.contains(tuple.getLinkageId());
     }
 
     public static int contributorCount() {
-        return CONTRIBUTOR_LINKAGE_IDS.size();
+        return requireInitialized().size();
     }
 
     public static Set<Long> contributorLinkageIds() {
-        return CONTRIBUTOR_LINKAGE_IDS;
+        return requireInitialized();
     }
 
-    private static Set<Long> computeContributorLinkageIds() {
-        List<Tuple> tuples = LclFlowTupleReader.loadUnchecked(LclFlowTupleReader.DEFAULT_RESOURCE);
-        LclFlowAllFieldsMainQuery.Settings settings = LclFlowAllFieldsMainQuery.Settings.defaults();
-        Map<GroupKey, Set<Long>> alertCandidatesByGroup = new LinkedHashMap<>();
-
-        for (Tuple tuple : tuples) {
-            if (!tuple.hasLinkageId() || !passesActiveDayFilter(tuple, settings)) {
-                continue;
-            }
-
-            boolean stdTariff = tuple.getField("f1") == 0d;
-            boolean alert = stdTariff
-                    ? LclFlowAllFieldsMainQuery.stdDailyLoadRisk(tuple, settings) >= settings.stdAlertThreshold()
-                    : LclFlowAllFieldsMainQuery.touEveningPeakRisk(tuple, settings) >= settings.touAlertThreshold();
-            if (!alert) {
-                continue;
-            }
-
-            GroupKey groupKey = new GroupKey(tuple.getTimestamp(), stdTariff ? "tariff_0" : "tariff_1");
-            alertCandidatesByGroup
-                    .computeIfAbsent(groupKey, ignored -> new LinkedHashSet<>())
-                    .add(tuple.getLinkageId());
-        }
-
+    static Set<Long> sourceContributorLinkageIds(List<Tuple> provenanceOutputs) {
         Set<Long> contributors = new LinkedHashSet<>();
-        for (Set<Long> groupLinkageIds : alertCandidatesByGroup.values()) {
-            if (groupLinkageIds.size() >= settings.minAlertHouseholds()) {
-                contributors.addAll(groupLinkageIds);
+        for (Tuple output : provenanceOutputs) {
+            for (GenealogTuple contributor : GenealogTraverser.INSTANCE.process(output)) {
+                if (contributor.type != GenealogTupleType.SOURCE) {
+                    throw new IllegalStateException("Expected only source contributors, got " + contributor.type);
+                }
+                if (!(contributor instanceof Tuple tuple)) {
+                    throw new IllegalStateException("Expected LCL tuple contributor, got " + contributor.getClass());
+                }
+                if (!tuple.hasLinkageId()) {
+                    throw new IllegalStateException("Contributor tuple does not have a linkage id");
+                }
+                contributors.add(tuple.getLinkageId());
             }
         }
         return Set.copyOf(contributors);
     }
 
-    private static boolean passesActiveDayFilter(Tuple tuple, LclFlowAllFieldsMainQuery.Settings settings) {
-        return tuple.getField("f2") >= settings.minDailyKwh()
-                && tuple.getField("f11") < settings.maxZeroHalfHours();
-    }
-
-    private record GroupKey(long timestamp, String key) {
+    private static Set<Long> requireInitialized() {
+        Set<Long> contributors = contributorLinkageIds;
+        if (contributors == null) {
+            throw new IllegalStateException(
+                    "LCL-flow contributor condition has not been initialized from provenance");
+        }
+        return contributors;
     }
 }
