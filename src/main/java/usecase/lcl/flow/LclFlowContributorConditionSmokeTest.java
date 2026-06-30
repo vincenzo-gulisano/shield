@@ -52,6 +52,8 @@ public final class LclFlowContributorConditionSmokeTest {
         QueryMapper.QueryConditionFork fork =
                 new QueryMapper.QueryConditionFork("QCF1", LclFlowContributorCondition.CONDITION_ID);
         QueryMapper.Union union = new QueryMapper.Union("U1");
+        QueryMapper.FilterQueryCondition contributorPass =
+                new QueryMapper.FilterQueryCondition("FQ1", LclFlowContributorCondition.CONDITION_ID, true);
         QueryMapper.MapNoise nonContributorNoise =
                 new QueryMapper.MapNoise("MN1", "f8", 0.25, QueryMapper.FieldSemanticType.CONTINUOUS_NUMERIC);
         QueryMapper.Sink sink = new QueryMapper.Sink("sink");
@@ -59,10 +61,12 @@ public final class LclFlowContributorConditionSmokeTest {
         graph.addNode(source);
         graph.addNode(fork);
         graph.addNode(union);
+        graph.addNode(contributorPass);
         graph.addNode(nonContributorNoise);
         graph.addNode(sink);
         graph.setArcValue(source, fork, ArcType.DEFAULT_ARC);
-        graph.setArcValue(fork, union, ArcType.DEFAULT_ARC);
+        graph.setArcValue(fork, contributorPass, ArcType.DEFAULT_ARC);
+        graph.setArcValue(contributorPass, union, ArcType.DEFAULT_ARC);
         graph.setArcValue(fork, nonContributorNoise, ArcType.DEFAULT_ARC);
         graph.setArcValue(nonContributorNoise, union, ArcType.DEFAULT_ARC);
         graph.setArcValue(union, sink, ArcType.DEFAULT_ARC);
@@ -72,7 +76,10 @@ public final class LclFlowContributorConditionSmokeTest {
     private static Tree<String> contributorRootTree() {
         return tree("<pipeline>",
                 tree("<contributor_root>",
-                        tree("<empty_pipeline>", tree("noop")),
+                        tree("<sorted_pipeline>",
+                                tree("<ordinary_operator>",
+                                        tree("<filter_query_condition>",
+                                                tree("<condition_keep>", tree("keep_true"))))),
                         tree("<sorted_pipeline>",
                                 tree("<ordinary_operator>",
                                         tree("<map_condition_preserving_noise_continuous_numeric>",
@@ -86,8 +93,9 @@ public final class LclFlowContributorConditionSmokeTest {
                         && fork.conditionId().equals(LclFlowContributorCondition.CONDITION_ID))
                 .toList();
         require(branchArcs.size() == 2, "Expected two outgoing arcs from the contributor fork");
-        require(branchArcs.getFirst().target() instanceof QueryMapper.Union,
-                "Contributor true branch should be the direct union branch");
+        require(branchArcs.getFirst().target() instanceof QueryMapper.FilterQueryCondition filter
+                        && filter.keepMatching(),
+                "Contributor true branch should be the first generated branch");
     }
 
     private static void assertContributorBranchIsUnchanged(List<Tuple> input, List<Tuple> output) {
