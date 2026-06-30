@@ -4,6 +4,7 @@ import io.github.ericmedvet.jgea.core.representation.graph.Graph;
 import io.github.ericmedvet.jgea.core.representation.graph.LinkedHashGraph;
 import mappers.QueryMapper;
 import mappers.QueryMapper.ArcType;
+import problem.utils.PrivacyMetricChoice;
 import query.LiebreAnonymizationQueryFromGraph;
 import usecase.common.Tuple;
 
@@ -16,49 +17,49 @@ public final class LclFlowQueryAwareOperatorSmokeTest {
     }
 
     public static void main(String[] args) throws IOException {
+        new LclFlowStreamAnonymizationProblem(
+                LclFlowTupleReader.DEFAULT_RESOURCE,
+                PrivacyMetricChoice.LINKAGE_ATTACK_TOP_K_CONTAINMENT,
+                0.02d,
+                20);
         Graph<QueryMapper.OperatorRepresentation, ArcType> graph = graph();
         List<Tuple> input = input();
         List<Tuple> output = new LiebreAnonymizationQueryFromGraph().processAnonymizationQuery(graph, input);
-        require(output.size() == input.size(), "Query-aware graph changed tuple count");
+        require(output.size() == LclFlowContributorCondition.contributorCount(),
+                "Query-aware graph did not keep exactly the contributor tuples");
 
         Graph<QueryMapper.OperatorRepresentation, ArcType> parsedGraph = QueryMapper.parseGraphFromString(graph.toString());
-        List<Tuple> parsedOutput = new LiebreAnonymizationQueryFromGraph().processAnonymizationQuery(parsedGraph, input);
-        require(parsedOutput.size() == input.size(), "Parsed query-aware graph changed tuple count");
+        List<Tuple> parsedOutput = new LiebreAnonymizationQueryFromGraph().processAnonymizationQuery(parsedGraph, input());
+        require(parsedOutput.size() == output.size(), "Parsed query-aware graph changed tuple count");
 
         System.exit(0);
     }
 
     private static List<Tuple> input() {
-        return List.of(
-                tuple(1L, "a", 0, 10, 0.9, 0.2, 0.4, 0.2, 0.4, 0.1, 0.4, 35, 2),
-                tuple(1L, "b", 0, 11, 1.0, 0.2, 0.5, 0.2, 0.5, 0.1, 0.4, 36, 3),
-                tuple(1L, "c", 1, 12, 1.1, 0.2, 0.6, 0.2, 0.6, 0.1, 0.4, 20, 4),
-                tuple(1L, "d", 1, 13, 1.2, 0.2, 0.7, 0.2, 0.7, 0.1, 0.4, 21, 5),
-                tuple(2L, "a", 0, 14, 1.3, 0.2, 0.8, 0.2, 0.8, 0.1, 0.4, 37, 6),
-                tuple(2L, "b", 1, 15, 1.4, 0.2, 0.9, 0.2, 0.9, 0.1, 0.4, 22, 7));
-    }
-
-    private static Tuple tuple(long timestamp, String key, double... fields) {
-        return new Tuple(timestamp, key, fields);
+        return LclFlowTupleReader.loadUnchecked(LclFlowTupleReader.DEFAULT_RESOURCE);
     }
 
     private static Graph<QueryMapper.OperatorRepresentation, ArcType> graph() {
         Graph<QueryMapper.OperatorRepresentation, ArcType> graph = new LinkedHashGraph<>();
 
         QueryMapper.Source source = new QueryMapper.Source("source");
-        QueryMapper.QueryConditionFork fork = new QueryMapper.QueryConditionFork("QCF1", "c_f1_eq_0");
+        QueryMapper.QueryConditionFork fork =
+                new QueryMapper.QueryConditionFork("QCF1", LclFlowContributorCondition.CONDITION_ID);
         QueryMapper.MapConditionPartitionShuffle leftShuffle =
-                new QueryMapper.MapConditionPartitionShuffle("MCGS1", "f10", "c_f10_between_34_45");
+                new QueryMapper.MapConditionPartitionShuffle("MCGS1", "f10", LclFlowContributorCondition.CONDITION_ID);
         QueryMapper.MapConditionPreservingRIR leftRir =
                 new QueryMapper.MapConditionPreservingRIR(
-                        "MCR1", "f8", "c_f1_eq_0", QueryMapper.FieldSemanticType.CONTINUOUS_NUMERIC);
+                        "MCR1", "f8", LclFlowContributorCondition.CONDITION_ID,
+                        QueryMapper.FieldSemanticType.CONTINUOUS_NUMERIC);
         QueryMapper.MapConditionPairwiseSwap rightSwap =
-                new QueryMapper.MapConditionPairwiseSwap("MCPS1", "f11", "c_f10_between_34_45");
+                new QueryMapper.MapConditionPairwiseSwap("MCPS1", "f11", LclFlowContributorCondition.CONDITION_ID);
         QueryMapper.MapConditionPreservingNoise rightNoise =
                 new QueryMapper.MapConditionPreservingNoise(
-                        "MCN1", "f9", 0.05, "c_f2_ge_1_0", QueryMapper.FieldSemanticType.CONTINUOUS_NUMERIC);
+                        "MCN1", "f9", 0.05, LclFlowContributorCondition.CONDITION_ID,
+                        QueryMapper.FieldSemanticType.CONTINUOUS_NUMERIC);
         QueryMapper.Union union = new QueryMapper.Union("U1");
-        QueryMapper.FilterQueryCondition filter = new QueryMapper.FilterQueryCondition("FQ1", "c_f2_ge_1_0", true);
+        QueryMapper.FilterQueryCondition filter =
+                new QueryMapper.FilterQueryCondition("FQ1", LclFlowContributorCondition.CONDITION_ID, true);
         QueryMapper.Sink sink = new QueryMapper.Sink("sink");
 
         graph.addNode(source);

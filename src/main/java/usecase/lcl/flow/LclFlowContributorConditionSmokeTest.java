@@ -72,14 +72,12 @@ public final class LclFlowContributorConditionSmokeTest {
     private static Tree<String> contributorRootTree() {
         return tree("<pipeline>",
                 tree("<contributor_root>",
-                        tree(LclFlowContributorCondition.CONDITION_ID),
                         tree("<empty_pipeline>", tree("noop")),
                         tree("<sorted_pipeline>",
                                 tree("<ordinary_operator>",
                                         tree("<map_condition_preserving_noise_continuous_numeric>",
                                                 tree("f8"),
-                                                tree("0.25"),
-                                                tree("c_f2_ge_1_0"))))));
+                                                tree("0.25"))))));
     }
 
     private static void assertContributorForkDirectBranchFirst(Graph<QueryMapper.OperatorRepresentation, ArcType> graph) {

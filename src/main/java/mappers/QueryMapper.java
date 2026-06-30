@@ -55,6 +55,7 @@ import query.utils.TupleConditionSpec;
 import query.utils.TupleFieldType;
 import usecase.common.FieldValueSampler;
 import usecase.common.Tuple;
+import usecase.lcl.flow.LclFlowContributorCondition;
 
 import static query.utils.OperatorUtils.requireFinite;
 
@@ -332,10 +333,13 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
   }
 
   private OperatorRepresentation parseFilterQueryConditionNode(Tree<String> specificOpNode, String id) {
+    if (specificOpNode.nChildren() != 1) {
+      throw new IllegalArgumentException("<filter_query_condition> must have a keep token");
+    }
     return new FilterQueryCondition(
         id,
-        parseQueryConditionId(specificOpNode.child(0)),
-        parseConditionKeepNode(specificOpNode.child(1)));
+        LclFlowContributorCondition.CONDITION_ID,
+        parseConditionKeepNode(specificOpNode.child(0)));
   }
 
   private static String parseTokenNode(Tree<String> node) {
@@ -393,11 +397,15 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
 
   private OperatorRepresentation parseMapConditionPreservingNoiseNode(
       Tree<String> specificOpNode, String id, FieldSemanticType fieldType) {
+    if (specificOpNode.nChildren() != 2) {
+      throw new IllegalArgumentException(
+          specificOpNode.content() + " must have field and probability/percentage children");
+    }
     return new MapConditionPreservingNoise(
         id,
         parseTokenNode(specificOpNode.child(0)),
         Double.parseDouble(parseTokenNode(specificOpNode.child(1))),
-        parseQueryConditionId(specificOpNode.child(2)),
+        LclFlowContributorCondition.CONDITION_ID,
         fieldType);
   }
 
@@ -407,10 +415,14 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
 
   private OperatorRepresentation parseMapConditionPreservingRIRNode(
       Tree<String> specificOpNode, String id, FieldSemanticType fieldType) {
+    if (specificOpNode.nChildren() != 1) {
+      throw new IllegalArgumentException(
+          specificOpNode.content() + " must have a field child");
+    }
     return new MapConditionPreservingRIR(
         id,
         parseTokenNode(specificOpNode.child(0)),
-        parseQueryConditionId(specificOpNode.child(1)),
+        LclFlowContributorCondition.CONDITION_ID,
         fieldType);
   }
 
@@ -429,21 +441,25 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
   }
 
   private OperatorRepresentation parseMapConditionPairwiseSwapNode(Tree<String> specificOpNode, String id) {
+    if (specificOpNode.nChildren() != 1) {
+      throw new IllegalArgumentException(
+          specificOpNode.content() + " must have a field child");
+    }
     return new MapConditionPairwiseSwap(
         id,
         parseTokenNode(specificOpNode.child(0)).replace("'", ""),
-        parseQueryConditionId(specificOpNode.child(1)));
+        LclFlowContributorCondition.CONDITION_ID);
   }
 
   private OperatorRepresentation parseMapConditionPartitionShuffleNode(Tree<String> specificOpNode, String id) {
+    if (specificOpNode.nChildren() != 1) {
+      throw new IllegalArgumentException(
+          specificOpNode.content() + " must have a field child");
+    }
     return new MapConditionPartitionShuffle(
         id,
         parseTokenNode(specificOpNode.child(0)).replace("'", ""),
-        parseQueryConditionId(specificOpNode.child(1)));
-  }
-
-  private static String parseQueryConditionId(Tree<String> conditionNode) {
-    return parseTokenNode(conditionNode).replace("'", "");
+        LclFlowContributorCondition.CONDITION_ID);
   }
 
   private static boolean parseConditionKeepNode(Tree<String> keepNode) {
@@ -509,23 +525,25 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
   private OperatorRepresentation parseQueryConditionForkJoinNode(Tree<String> specificOpNode,
       OperatorRepresentation previousNode, Graph<OperatorRepresentation, ArcType> g,
       Map<String, Integer> operatorCounters) {
-    if (specificOpNode.nChildren() != 3) {
+    if (specificOpNode.nChildren() != 2) {
       throw new IllegalArgumentException(
-          specificOpNode.content() + " must have a query condition and two pipeline children");
+          specificOpNode.content() + " must have two pipeline children");
     }
-    if (!isPipelineNode(specificOpNode.child(1).content())
-        || !isPipelineNode(specificOpNode.child(2).content())) {
-      throw new IllegalArgumentException("The last two children of " + specificOpNode.content()
+    if (!isPipelineNode(specificOpNode.child(0).content())
+        || !isPipelineNode(specificOpNode.child(1).content())) {
+      throw new IllegalArgumentException("The pipeline children of " + specificOpNode.content()
           + " must be pipeline nodes");
     }
 
     String forkId = "QCF" + operatorCounters.merge("QueryConditionFork", 1, Integer::sum);
-    OperatorRepresentation forkOp = new QueryConditionFork(forkId, parseQueryConditionId(specificOpNode.child(0)));
+    OperatorRepresentation forkOp = new QueryConditionFork(
+        forkId,
+        LclFlowContributorCondition.CONDITION_ID);
     g.addNode(forkOp);
     g.setArcValue(previousNode, forkOp, ArcType.DEFAULT_ARC);
 
     return parseBranchPipelinesAndJoin(
-        specificOpNode.child(1), specificOpNode.child(2), forkOp, g, operatorCounters);
+        specificOpNode.child(0), specificOpNode.child(1), forkOp, g, operatorCounters);
   }
 
   private OperatorRepresentation parseBranchPipelinesAndJoin(
