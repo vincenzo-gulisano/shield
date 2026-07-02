@@ -18,6 +18,8 @@ import scheduling.basic.BasicLiebreScheduler;
 import stream.BackoffStreamFactory;
 import usecase.common.CollectionSourceFactory;
 import usecase.common.Tuple;
+import usecase.common.flow.InstrumentedStreamFactory;
+import usecase.common.flow.StreamFlowInstrumentation;
 
 /**
  * Branch-sensitive LCL flow query that uses all daily load-profile fields.

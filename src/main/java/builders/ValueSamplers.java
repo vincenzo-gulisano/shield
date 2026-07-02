@@ -6,6 +6,7 @@ import io.github.ericmedvet.jnb.core.Param;
 import java.util.List;
 import usecase.common.Tuple;
 import usecase.common.TupleFieldValueSampler;
+import usecase.geolife.mobility.GeoLifeTupleReader;
 import usecase.lcl.flow.LclFlowTupleReader;
 
 @Discoverable(prefixTemplate = "anonym.valueSampler")
@@ -19,6 +20,14 @@ public class ValueSamplers {
             @Param("inputCsvPath") String inputCsvPath,
             @Param("seed") int seed) {
         List<Tuple> tuples = LclFlowTupleReader.loadUnchecked(inputCsvPath);
+        return new TupleFieldValueSampler(tuples, seed);
+    }
+
+    @Cacheable
+    public static TupleFieldValueSampler geoLifeTupleFieldValueSampler(
+            @Param("inputCsvPath") String inputCsvPath,
+            @Param("seed") int seed) {
+        List<Tuple> tuples = GeoLifeTupleReader.loadUnchecked(inputCsvPath);
         return new TupleFieldValueSampler(tuples, seed);
     }
 }

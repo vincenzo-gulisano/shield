@@ -1,29 +1,25 @@
 package usecase.lcl.flow;
 
-import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import usecase.common.TupleMatchingScore;
 import usecase.common.TupleMatchingScore.DistanceMode;
 import usecase.common.Tuple;
+import usecase.common.flow.StreamFlowSnapshotSimilarity;
 
 public final class LclFlowSmokeTest {
-
-    private static final Path DEFAULT_OUTPUT_DIR = Path.of("outputs", "lcl-flow-smoke");
 
     private LclFlowSmokeTest() {
     }
 
     public static void main(String[] args) throws Exception {
         System.setProperty("java.awt.headless", "true");
-        Path outputDir = args.length > 0 ? Path.of(args[0]) : DEFAULT_OUTPUT_DIR;
 
         System.err.println("Loading LCL flow resource");
         List<Tuple> input = LclFlowTupleReader.readDefaultResource();
         System.err.println("Running all-fields LCL flow query on " + input.size() + " tuples");
         long start = System.nanoTime();
         LclFlowAllFieldsMainQuery.QueryResult result = LclFlowAllFieldsMainQuery.process(input, "smoke");
-        System.err.println("Writing LCL flow images");
         long elapsedMillis = Math.round((System.nanoTime() - start) / 1_000_000.0);
 
         long stdOutputs = result.outputTuples().stream().filter(tuple -> tuple.getKey().equals("tariff_0")).count();
@@ -34,7 +30,6 @@ public final class LclFlowSmokeTest {
         if (result.outputTuples().stream().anyMatch(tuple -> tuple.getNumFields() != 13)) {
             throw new IllegalStateException("Expected all-fields query outputs to have 13 fields");
         }
-        FlowImageWriter.writeSnapshotImages(result.flow(), outputDir);
         StreamFlowSnapshotSimilarity flowSimilarity = new StreamFlowSnapshotSimilarity(result.flow());
         double identityFidelity = flowSimilarity.apply(result.flow());
         double emptyFidelity = flowSimilarity.apply(StreamFlowSnapshotSimilarity.emptyLike(result.flow()));
@@ -61,9 +56,6 @@ public final class LclFlowSmokeTest {
         printRowSums(result.flow().streamNames(), result.flow().tupleCounts());
         System.out.println("Key row sums:");
         printRowSums(result.flow().streamNames(), result.flow().keyCounts());
-        System.out.println("Images:");
-        System.out.println(outputDir.resolve("tuple-flow.png").toAbsolutePath());
-        System.out.println(outputDir.resolve("key-flow.png").toAbsolutePath());
         System.out.println("First output tuples:");
         result.outputTuples().stream().limit(10).forEach(tuple -> System.out.printf(
                 "timestamp=%d key=%s fields=%s%n",

@@ -23,6 +23,7 @@ import problem.StreamAnonymizationProblem;
 import problem.StreamAnonymizationProblem_2ObjectivesPerf;
 import problem.StreamAnonymizationProblem_2ObjectivesRes;
 import problem.utils.PrivacyMetricChoice;
+import usecase.geolife.mobility.GeoLifeMobilityStreamAnonymizationProblem;
 import usecase.lcl.flow.LclFlowStreamAnonymizationProblem;
 
 @Discoverable(prefixTemplate = "anonym.problem")
@@ -53,6 +54,21 @@ public class Problems {
             @Param(value = "name", iS = "{inputCsvPath}") String name) {
 
         return new LclFlowStreamAnonymizationProblem(
+                inputCsvPath,
+                privacyMetric,
+                semanticsF1Threshold,
+                k);
+    }
+
+    @Cacheable
+    public static GeoLifeMobilityStreamAnonymizationProblem geoLifeMobilityStreamAnonymizationProblem(
+            @Param("inputCsvPath") String inputCsvPath,
+            @Param(value = "privacyMetric", dS = "LINKAGE_ATTACK_TOP_K_CONTAINMENT") PrivacyMetricChoice privacyMetric,
+            @Param(value = "semanticsF1Threshold", dD = 0.05) double semanticsF1Threshold,
+            @Param(value = "k", dI = 10) int k,
+            @Param(value = "name", iS = "{inputCsvPath}") String name) {
+
+        return new GeoLifeMobilityStreamAnonymizationProblem(
                 inputCsvPath,
                 privacyMetric,
                 semanticsF1Threshold,

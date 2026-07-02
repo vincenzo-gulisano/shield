@@ -1,4 +1,4 @@
-package usecase.lcl.flow;
+package usecase.geolife.mobility;
 
 import grammar.generator.FieldType;
 import io.github.ericmedvet.jgea.core.problem.SimpleMOProblem;
@@ -23,23 +23,13 @@ import usecase.common.TupleMatchingScore;
 import usecase.common.TupleMatchingScore.DistanceMode;
 import usecase.common.flow.StreamFlowSnapshotSimilarity;
 
-public class LclFlowStreamAnonymizationProblem implements
+public class GeoLifeMobilityStreamAnonymizationProblem implements
         SimpleMOProblem<Graph<OperatorRepresentation, ArcType>, Double> {
 
-    public static final List<String> LINKAGE_ATTACK_QUASI_IDENTIFIER_ATTRIBUTES =
-            List.of("f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f11");
-    public static final Map<String, FieldType> LINKAGE_ATTACK_QUASI_IDENTIFIER_TYPES = Map.ofEntries(
-            Map.entry("f1", FieldType.NOMINAL_CATEGORICAL),
-            Map.entry("f2", FieldType.CONTINUOUS_NUMERIC),
-            Map.entry("f3", FieldType.CONTINUOUS_NUMERIC),
-            Map.entry("f4", FieldType.CONTINUOUS_NUMERIC),
-            Map.entry("f5", FieldType.CONTINUOUS_NUMERIC),
-            Map.entry("f6", FieldType.CONTINUOUS_NUMERIC),
-            Map.entry("f7", FieldType.CONTINUOUS_NUMERIC),
-            Map.entry("f8", FieldType.CONTINUOUS_NUMERIC),
-            Map.entry("f9", FieldType.CONTINUOUS_NUMERIC),
-            Map.entry("f10", FieldType.DISCRETE_NUMERIC),
-            Map.entry("f11", FieldType.DISCRETE_NUMERIC));
+    public static final List<String> LINKAGE_ATTACK_QUASI_IDENTIFIER_ATTRIBUTES = List.of("f1", "f2");
+    public static final Map<String, FieldType> LINKAGE_ATTACK_QUASI_IDENTIFIER_TYPES = Map.of(
+            "f1", FieldType.CONTINUOUS_NUMERIC,
+            "f2", FieldType.CONTINUOUS_NUMERIC);
 
     private static final AtomicLong QUERY_COUNTER = new AtomicLong(0L);
     private static final SequencedMap<String, Comparator<Double>> OBJECTIVES = new TreeMap<>(
@@ -56,13 +46,13 @@ public class LclFlowStreamAnonymizationProblem implements
     private final PrivacyMetricChoice privacyMetricChoice;
     private final double semanticsF1Threshold;
     private final List<Tuple> inputTuples;
-    private final LclFlowAllFieldsMainQuery.Settings querySettings;
-    private final LclFlowAllFieldsMainQuery.QueryResult baselineOutcome;
+    private final GeoLifeMobilityMainQuery.Settings querySettings;
+    private final GeoLifeMobilityMainQuery.QueryResult baselineOutcome;
     private final KAnonymityPrivacyCardinality kAnonymityPrivacy;
     private final LinkageAttackPrivacy linkageAttackPrivacy;
     private final StreamFlowSnapshotSimilarity fidelitySimilarity;
 
-    public LclFlowStreamAnonymizationProblem(
+    public GeoLifeMobilityStreamAnonymizationProblem(
             String inputCsvPath,
             PrivacyMetricChoice privacyMetricChoice,
             double semanticsF1Threshold,
@@ -70,13 +60,16 @@ public class LclFlowStreamAnonymizationProblem implements
         this.inputCsvPath = inputCsvPath;
         this.privacyMetricChoice = privacyMetricChoice;
         this.semanticsF1Threshold = semanticsF1Threshold;
-        this.inputTuples = LclFlowTupleReader.loadUnchecked(inputCsvPath);
+        this.inputTuples = GeoLifeTupleReader.loadUnchecked(inputCsvPath);
         long minTimestamp = this.inputTuples.stream().mapToLong(Tuple::getTimestamp).min().orElseThrow();
         long maxTimestamp = this.inputTuples.stream().mapToLong(Tuple::getTimestamp).max().orElseThrow();
-        this.querySettings = LclFlowAllFieldsMainQuery.Settings.defaults()
-                .withInstrumentationRange(minTimestamp, maxTimestamp);
-        LclFlowContributorCondition.initializeFromProvenance(this.inputTuples, querySettings);
-        this.baselineOutcome = LclFlowAllFieldsMainQuery.process(this.inputTuples, "main", querySettings);
+        GeoLifeMobilityMainQuery.Settings defaultSettings = GeoLifeMobilityMainQuery.Settings.defaults();
+        this.querySettings = defaultSettings.withInstrumentationRange(
+                minTimestamp,
+                maxTimestamp + Math.max(
+                        defaultSettings.userWindowSizeMillis(),
+                        defaultSettings.cellWindowSizeMillis()));
+        this.baselineOutcome = GeoLifeMobilityMainQuery.process(this.inputTuples, "main", querySettings);
         this.kAnonymityPrivacy = usesKAnonymityMetric(privacyMetricChoice)
                 ? new KAnonymityPrivacyCardinality(
                         this.inputTuples,
@@ -102,7 +95,7 @@ public class LclFlowStreamAnonymizationProblem implements
     public Function<Graph<OperatorRepresentation, ArcType>, SequencedMap<String, Double>> qualityFunction() {
         return graph -> {
             SequencedMap<String, Double> qualities = new TreeMap<>();
-            String queryId = "LCL-FLOW-" + QUERY_COUNTER.getAndIncrement();
+            String queryId = "GEOLIFE-MOBILITY-" + QUERY_COUNTER.getAndIncrement();
             try {
                 LiebreAnonymizationQueryFromGraph executor = new LiebreAnonymizationQueryFromGraph();
                 List<Tuple> modifiedEvents = sortedByTimestampAndKey(
@@ -116,8 +109,8 @@ public class LclFlowStreamAnonymizationProblem implements
                     return qualities;
                 }
 
-                LclFlowAllFieldsMainQuery.QueryResult modifiedOutcome =
-                        LclFlowAllFieldsMainQuery.process(modifiedEvents, queryId, querySettings);
+                GeoLifeMobilityMainQuery.QueryResult modifiedOutcome =
+                        GeoLifeMobilityMainQuery.process(modifiedEvents, queryId, querySettings);
                 qualities.put("fidelity", fidelitySimilarity.apply(modifiedOutcome.flow()));
                 qualities.put("semantics", TupleMatchingScore.f1(
                         TupleMatchingScore.groupByTimestampAndKey(baselineOutcome.outputTuples()),
@@ -127,14 +120,14 @@ public class LclFlowStreamAnonymizationProblem implements
                 return qualities;
             } catch (Exception e) {
                 throw new RuntimeException(
-                        "Error executing LCL flow query " + queryId + " for graph " + graph
+                        "Error executing GeoLife mobility query " + queryId + " for graph " + graph
                                 + " on " + inputCsvPath,
                         e);
             }
         };
     }
 
-    public LclFlowAllFieldsMainQuery.QueryResult baselineOutcome() {
+    public GeoLifeMobilityMainQuery.QueryResult baselineOutcome() {
         return baselineOutcome;
     }
 

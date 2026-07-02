@@ -1,4 +1,4 @@
-package usecase.lcl.flow;
+package usecase.common.flow;
 
 import common.util.backoff.Backoff;
 import component.StreamConsumer;

@@ -4,6 +4,8 @@ import common.util.backoff.InactiveBackoff;
 import java.util.List;
 import stream.BackoffStreamFactory;
 import usecase.common.Tuple;
+import usecase.common.flow.InstrumentedStreamFactory;
+import usecase.common.flow.StreamFlowInstrumentation;
 
 public final class LclFlowInstrumentationSmokeTest {
 

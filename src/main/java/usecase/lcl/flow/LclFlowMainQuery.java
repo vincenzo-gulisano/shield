@@ -15,6 +15,8 @@ import scheduling.basic.BasicLiebreScheduler;
 import stream.BackoffStreamFactory;
 import usecase.common.CollectionSourceFactory;
 import usecase.common.Tuple;
+import usecase.common.flow.InstrumentedStreamFactory;
+import usecase.common.flow.StreamFlowInstrumentation;
 
 public final class LclFlowMainQuery {
 

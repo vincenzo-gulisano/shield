@@ -1,4 +1,4 @@
-package usecase.lcl.flow;
+package usecase.common.flow;
 
 import component.StreamConsumer;
 import component.StreamProducer;

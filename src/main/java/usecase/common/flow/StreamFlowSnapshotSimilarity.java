@@ -1,4 +1,4 @@
-package usecase.lcl.flow;
+package usecase.common.flow;
 
 import java.util.Arrays;
 import java.util.List;
