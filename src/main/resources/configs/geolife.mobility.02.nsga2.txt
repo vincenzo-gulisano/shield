@@ -28,7 +28,7 @@ ea.experiment(
     ea.run(
       problem = anonym.problem.geoLifeMobilityStreamAnonymizationProblem(
         inputCsvPath = "datasets/geolife_60mins.csv";
-        privacyMetric = K_ANONYMITY_CARDINALITY_Q99;
+        privacyMetric = LINKAGE_ATTACK_TOP_K_CONTAINMENT;
         semanticsF1Threshold = 0.02;
         k = 20
       )

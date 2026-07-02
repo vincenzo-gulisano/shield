@@ -25,11 +25,16 @@ public final class GeoLifeMobilityGrammarSmokeTest {
 
     public static void main(String[] args) throws IOException {
         assertMatches("geolife.mobility.01.bnf", mobility01Grammar());
+        assertMatches("geolife.mobility.04.bnf", mobility04Grammar());
         System.exit(0);
     }
 
     public static String mobility01Grammar() {
         return TypedGrammarGenerator.generate(GEOLIFE_FIELDS, mobility01Options());
+    }
+
+    public static String mobility04Grammar() {
+        return TypedGrammarGenerator.generate(GEOLIFE_FIELDS, mobility04Options());
     }
 
     private static Options mobility01Options() {
@@ -54,6 +59,10 @@ public final class GeoLifeMobilityGrammarSmokeTest {
                 PERCENTAGES,
                 NUMERIC_VALUES,
                 NOMINAL_VALUES);
+    }
+
+    private static Options mobility04Options() {
+        return Options.timestampAwareDefaults().withSortedOperatorWrappers(true);
     }
 
     private static void assertMatches(String grammarFile, String generatedGrammar) throws IOException {
