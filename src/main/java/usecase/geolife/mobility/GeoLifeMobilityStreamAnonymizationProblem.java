@@ -64,11 +64,20 @@ public class GeoLifeMobilityStreamAnonymizationProblem implements
         long minTimestamp = this.inputTuples.stream().mapToLong(Tuple::getTimestamp).min().orElseThrow();
         long maxTimestamp = this.inputTuples.stream().mapToLong(Tuple::getTimestamp).max().orElseThrow();
         GeoLifeMobilityMainQuery.Settings defaultSettings = GeoLifeMobilityMainQuery.Settings.defaults();
+        long maxWindowSizeMillis = Math.max(
+                defaultSettings.userWindowSizeMillis(),
+                defaultSettings.cellWindowSizeMillis());
+        /*
+         * Liebre time aggregates emit output tuples at the window left boundary
+         * (the window start timestamp). The first aggregate output can therefore
+         * be earlier than the first source tuple by up to the largest window size.
+         * If the aggregate convention changes to right-boundary timestamps, move
+         * this padding to the upper bound instead: keep the input minimum here and
+         * use maxTimestamp + maxWindowSizeMillis as the upper instrumentation bound.
+         */
         this.querySettings = defaultSettings.withInstrumentationRange(
-                minTimestamp,
-                maxTimestamp + Math.max(
-                        defaultSettings.userWindowSizeMillis(),
-                        defaultSettings.cellWindowSizeMillis()));
+                minTimestamp - maxWindowSizeMillis,
+                maxTimestamp);
         this.baselineOutcome = GeoLifeMobilityMainQuery.process(this.inputTuples, "main", querySettings);
         this.kAnonymityPrivacy = usesKAnonymityMetric(privacyMetricChoice)
                 ? new KAnonymityPrivacyCardinality(

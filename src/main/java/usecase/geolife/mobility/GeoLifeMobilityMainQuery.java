@@ -34,11 +34,20 @@ public final class GeoLifeMobilityMainQuery {
         }
         long minTimestamp = inputStream.stream().mapToLong(Tuple::getTimestamp).min().orElseThrow();
         long maxTimestamp = inputStream.stream().mapToLong(Tuple::getTimestamp).max().orElseThrow();
+        long maxWindowSizeMillis = Math.max(settings.userWindowSizeMillis(), settings.cellWindowSizeMillis());
+        /*
+         * Liebre time aggregates emit output tuples at the window left boundary
+         * (the window start timestamp). The first aggregate output can therefore
+         * be earlier than the first source tuple by up to the largest window size.
+         * If the aggregate convention changes to right-boundary timestamps, move
+         * this padding to the upper bound instead: keep the input minimum here and
+         * use maxTimestamp + maxWindowSizeMillis below.
+         */
         long instrumentationMinTimestamp = settings.instrumentationMinTimestamp() == null
-                ? minTimestamp
+                ? minTimestamp - maxWindowSizeMillis
                 : settings.instrumentationMinTimestamp();
         long instrumentationMaxTimestamp = settings.instrumentationMaxTimestamp() == null
-                ? maxTimestamp + Math.max(settings.userWindowSizeMillis(), settings.cellWindowSizeMillis())
+                ? maxTimestamp
                 : settings.instrumentationMaxTimestamp();
 
         StreamFlowInstrumentation instrumentation = new StreamFlowInstrumentation(
