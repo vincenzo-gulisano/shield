@@ -78,6 +78,7 @@ public class GeoLifeMobilityStreamAnonymizationProblem implements
         this.querySettings = defaultSettings.withInstrumentationRange(
                 minTimestamp - maxWindowSizeMillis,
                 maxTimestamp);
+        GeoLifeMobilityContributorCondition.initializeFromProvenance(this.inputTuples, querySettings);
         this.baselineOutcome = GeoLifeMobilityMainQuery.process(this.inputTuples, "main", querySettings);
         this.kAnonymityPrivacy = usesKAnonymityMetric(privacyMetricChoice)
                 ? new KAnonymityPrivacyCardinality(

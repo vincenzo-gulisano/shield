@@ -1,4 +1,4 @@
-package usecase.lcl.flow;
+package usecase.geolife.mobility;
 
 import io.github.ericmedvet.jgea.core.representation.graph.Graph;
 import io.github.ericmedvet.jgea.core.representation.graph.Graph.Arc;
@@ -14,19 +14,19 @@ import problem.utils.PrivacyMetricChoice;
 import query.LiebreAnonymizationQueryFromGraph;
 import usecase.common.Tuple;
 
-public final class LclFlowContributorConditionSmokeTest {
+public final class GeoLifeMobilityContributorConditionSmokeTest {
 
-    private LclFlowContributorConditionSmokeTest() {
+    private GeoLifeMobilityContributorConditionSmokeTest() {
     }
 
     public static void main(String[] args) throws IOException {
-        List<Tuple> input = LclFlowTupleReader.loadUnchecked(LclFlowTupleReader.DEFAULT_RESOURCE);
-        new LclFlowStreamAnonymizationProblem(
-                LclFlowTupleReader.DEFAULT_RESOURCE,
+        List<Tuple> input = GeoLifeTupleReader.loadUnchecked(GeoLifeTupleReader.DEFAULT_RESOURCE);
+        new GeoLifeMobilityStreamAnonymizationProblem(
+                GeoLifeTupleReader.DEFAULT_RESOURCE,
                 PrivacyMetricChoice.LINKAGE_ATTACK_TOP_K_CONTAINMENT,
                 0.02d,
                 20);
-        int contributorCount = LclFlowContributorCondition.contributorCount();
+        int contributorCount = GeoLifeMobilityContributorCondition.contributorCount();
         require(contributorCount > 0, "Expected at least one contributor tuple");
         require(contributorCount < input.size(), "Contributor condition should not match every tuple");
 
@@ -36,14 +36,17 @@ public final class LclFlowContributorConditionSmokeTest {
                 new LiebreAnonymizationQueryFromGraph().processAnonymizationQuery(graph, input));
 
         Graph<QueryMapper.OperatorRepresentation, ArcType> treeMappedGraph =
-                new QueryMapper(null, LclFlowContributorCondition.CONDITION_ID)
+                new QueryMapper(null, GeoLifeMobilityContributorCondition.CONDITION_ID)
                         .mapperFor(new LinkedHashGraph<>())
                         .apply(contributorRootTree());
         assertContributorForkDirectBranchFirst(treeMappedGraph);
         assertContributorBranchIsUnchanged(input,
                 new LiebreAnonymizationQueryFromGraph().processAnonymizationQuery(treeMappedGraph, input));
 
-        System.out.printf("lclFlowContributorCondition contributors=%d total=%d%n", contributorCount, input.size());
+        System.out.printf(
+                "geoLifeMobilityContributorCondition contributors=%d total=%d%n",
+                contributorCount,
+                input.size());
         System.exit(0);
     }
 
@@ -52,12 +55,12 @@ public final class LclFlowContributorConditionSmokeTest {
 
         QueryMapper.Source source = new QueryMapper.Source("source");
         QueryMapper.QueryConditionFork fork =
-                new QueryMapper.QueryConditionFork("QCF1", LclFlowContributorCondition.CONDITION_ID);
+                new QueryMapper.QueryConditionFork("QCF1", GeoLifeMobilityContributorCondition.CONDITION_ID);
         QueryMapper.Union union = new QueryMapper.Union("U1");
         QueryMapper.FilterQueryCondition contributorPass =
-                new QueryMapper.FilterQueryCondition("FQ1", LclFlowContributorCondition.CONDITION_ID, true);
+                new QueryMapper.FilterQueryCondition("FQ1", GeoLifeMobilityContributorCondition.CONDITION_ID, true);
         QueryMapper.MapNoise nonContributorNoise =
-                new QueryMapper.MapNoise("MN1", "f8", 0.25, QueryMapper.FieldSemanticType.CONTINUOUS_NUMERIC);
+                new QueryMapper.MapNoise("MN1", "f1", 0.25, QueryMapper.FieldSemanticType.CONTINUOUS_NUMERIC);
         QueryMapper.Sink sink = new QueryMapper.Sink("sink");
 
         graph.addNode(source);
@@ -85,16 +88,16 @@ public final class LclFlowContributorConditionSmokeTest {
                         tree("<sorted_pipeline>",
                                 tree("<ordinary_operator>",
                                         tree("<map_condition_preserving_noise_continuous_numeric>",
-                                                tree("f8"),
+                                                tree("f1"),
                                                 tree("0.25"))))));
     }
 
     private static void assertContributorForkDirectBranchFirst(Graph<QueryMapper.OperatorRepresentation, ArcType> graph) {
         List<Arc<QueryMapper.OperatorRepresentation>> branchArcs = graph.arcs().stream()
                 .filter(arc -> arc.source() instanceof QueryMapper.QueryConditionFork fork
-                        && fork.conditionId().equals(LclFlowContributorCondition.CONDITION_ID))
+                        && fork.conditionId().equals(GeoLifeMobilityContributorCondition.CONDITION_ID))
                 .toList();
-        require(branchArcs.size() == 2, "Expected two outgoing arcs from the contributor fork");
+        require(branchArcs.size() == 2, "Expected two outgoing arcs from the GeoLife contributor fork");
         require(branchArcs.getFirst().target() instanceof QueryMapper.FilterQueryCondition filter
                         && filter.keepMatching(),
                 "Contributor true branch should be the first generated branch");
@@ -115,12 +118,12 @@ public final class LclFlowContributorConditionSmokeTest {
             require(tuple.hasLinkageId(), "Output tuple without linkage id");
             Tuple original = originalByLinkageId.get(tuple.getLinkageId());
             require(original != null, "Unknown output linkage id: " + tuple.getLinkageId());
-            if (LclFlowContributorCondition.isContributor(tuple)) {
+            if (GeoLifeMobilityContributorCondition.isContributor(tuple)) {
                 outputContributors++;
                 assertSameTupleFields(original, tuple);
             }
         }
-        require(outputContributors == LclFlowContributorCondition.contributorCount(),
+        require(outputContributors == GeoLifeMobilityContributorCondition.contributorCount(),
                 "Contributor count changed in output: " + outputContributors);
     }
 

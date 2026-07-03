@@ -20,7 +20,8 @@ ea.experiment(
           fieldValueSampler = anonym.valueSampler.lclFlowTupleFieldValueSampler(
             inputCsvPath = "datasets/lcl_flow_daily_10days_100keys.csv";
             seed = 0
-          )
+          );
+          conditionId = "c_lcl_flow_contributor"
         )
       )
     ])

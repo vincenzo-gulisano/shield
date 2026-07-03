@@ -55,7 +55,6 @@ import query.utils.TupleConditionSpec;
 import query.utils.TupleFieldType;
 import usecase.common.FieldValueSampler;
 import usecase.common.Tuple;
-import usecase.lcl.flow.LclFlowContributorCondition;
 
 import static query.utils.OperatorUtils.requireFinite;
 
@@ -68,13 +67,19 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
   private static final String DCR = "dcr";
 
   private final FieldValueSampler fieldValueSampler;
+  private final String conditionId;
 
   public QueryMapper() {
-    this.fieldValueSampler = null;
+    this(null, null);
   }
 
   public QueryMapper(FieldValueSampler fieldValueSampler) {
-    this.fieldValueSampler = Objects.requireNonNull(fieldValueSampler);
+    this(fieldValueSampler, null);
+  }
+
+  public QueryMapper(FieldValueSampler fieldValueSampler, String conditionId) {
+    this.fieldValueSampler = fieldValueSampler;
+    this.conditionId = conditionId == null || conditionId.isBlank() ? null : conditionId;
   }
 
   @Override
@@ -338,7 +343,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     }
     return new FilterQueryCondition(
         id,
-        LclFlowContributorCondition.CONDITION_ID,
+        requireConditionId(specificOpNode.content()),
         parseConditionKeepNode(specificOpNode.child(0)));
   }
 
@@ -405,7 +410,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
         id,
         parseTokenNode(specificOpNode.child(0)),
         Double.parseDouble(parseTokenNode(specificOpNode.child(1))),
-        LclFlowContributorCondition.CONDITION_ID,
+        requireConditionId(specificOpNode.content()),
         fieldType);
   }
 
@@ -422,7 +427,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     return new MapConditionPreservingRIR(
         id,
         parseTokenNode(specificOpNode.child(0)),
-        LclFlowContributorCondition.CONDITION_ID,
+        requireConditionId(specificOpNode.content()),
         fieldType);
   }
 
@@ -448,7 +453,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     return new MapConditionPairwiseSwap(
         id,
         parseTokenNode(specificOpNode.child(0)).replace("'", ""),
-        LclFlowContributorCondition.CONDITION_ID);
+        requireConditionId(specificOpNode.content()));
   }
 
   private OperatorRepresentation parseMapConditionPartitionShuffleNode(Tree<String> specificOpNode, String id) {
@@ -459,7 +464,15 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     return new MapConditionPartitionShuffle(
         id,
         parseTokenNode(specificOpNode.child(0)).replace("'", ""),
-        LclFlowContributorCondition.CONDITION_ID);
+        requireConditionId(specificOpNode.content()));
+  }
+
+  private String requireConditionId(String operatorName) {
+    if (conditionId == null) {
+      throw new IllegalStateException(
+          operatorName + " requires QueryMapper to be configured with a conditionId");
+    }
+    return conditionId;
   }
 
   private static boolean parseConditionKeepNode(Tree<String> keepNode) {
@@ -538,7 +551,7 @@ public class QueryMapper implements InvertibleMapper<Tree<String>, Graph<Operato
     String forkId = "QCF" + operatorCounters.merge("QueryConditionFork", 1, Integer::sum);
     OperatorRepresentation forkOp = new QueryConditionFork(
         forkId,
-        LclFlowContributorCondition.CONDITION_ID);
+        requireConditionId(specificOpNode.content()));
     g.addNode(forkOp);
     g.setArcValue(previousNode, forkOp, ArcType.DEFAULT_ARC);
 

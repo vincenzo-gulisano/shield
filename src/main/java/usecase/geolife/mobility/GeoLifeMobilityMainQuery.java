@@ -4,13 +4,21 @@ import common.util.backoff.InactiveBackoff;
 import component.operator.Operator;
 import component.sink.Sink;
 import component.source.Source;
+import experimental.provenance.ProvenanceQueryTransformer;
+import experimental.provenance.UIDFactory;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import query.LiebreContext;
 import query.Query;
+import scheduling.basic.BasicLiebreScheduler;
+import stream.BackoffStreamFactory;
 import usecase.common.CollectionSourceFactory;
 import usecase.common.Tuple;
+import usecase.common.flow.InstrumentedStreamFactory;
 import usecase.common.flow.StreamFlowInstrumentation;
 
 public final class GeoLifeMobilityMainQuery {
@@ -54,19 +62,61 @@ public final class GeoLifeMobilityMainQuery {
                 instrumentationMinTimestamp,
                 instrumentationMaxTimestamp,
                 settings.timeBins());
-        Query query = new Query(settings.streamCapacity());
+        Query query = new Query(
+                new BasicLiebreScheduler(),
+                new InstrumentedStreamFactory(new BackoffStreamFactory(), instrumentation),
+                settings.streamCapacity());
         query.setBackoff(1, 1, 1);
+        BuiltQuery builtQuery = buildQuery(query, inputStream, queryId, settings);
 
-        List<Tuple> outputTuples = java.util.Collections.synchronizedList(new ArrayList<>());
+        runUntilSinksFinish(query, List.of(builtQuery.sink()), settings.maxWaitMillis(), "GeoLife mobility query");
+        builtQuery.outputTuples().sort(Comparator.comparingLong(Tuple::getTimestamp).thenComparing(Tuple::getKey));
+        return new QueryResult(List.copyOf(builtQuery.outputTuples()), instrumentation.snapshot());
+    }
+
+    public static ProvenanceQueryResult processWithProvenance(List<Tuple> inputStream, String queryId) {
+        return processWithProvenance(inputStream, queryId, Settings.defaults());
+    }
+
+    public static ProvenanceQueryResult processWithProvenance(
+            List<Tuple> inputStream,
+            String queryId,
+            Settings settings) {
+        if (inputStream == null || inputStream.isEmpty()) {
+            throw new IllegalArgumentException("inputStream cannot be null or empty");
+        }
+        Query original = new Query(settings.streamCapacity());
+        original.setBackoff(1, 1, 1);
+        BuiltQuery builtQuery = buildQuery(original, inputStream, queryId, settings);
+        boolean uidsWereEnabled = UIDFactory.INSTANCE.isUIDsEnabled();
+        if (!uidsWereEnabled) {
+            UIDFactory.INSTANCE.enableUIDs();
+        }
+        try {
+            Query provenanceQuery = new ProvenanceQueryTransformer().transform(original);
+            runUntilSinksFinish(
+                    provenanceQuery,
+                    provenanceQuery.sinks(),
+                    settings.maxWaitMillis(),
+                    "GeoLife mobility provenance query");
+            builtQuery.outputTuples().sort(Comparator.comparingLong(Tuple::getTimestamp).thenComparing(Tuple::getKey));
+            return new ProvenanceQueryResult(List.copyOf(builtQuery.outputTuples()));
+        } finally {
+            if (!uidsWereEnabled) {
+                UIDFactory.INSTANCE.disableUIDs();
+            }
+        }
+    }
+
+    private static BuiltQuery buildQuery(
+            Query query,
+            List<Tuple> inputStream,
+            String queryId,
+            Settings settings) {
+        List<Tuple> outputTuples = Collections.synchronizedList(new ArrayList<>());
         Source<Tuple> source = query.addBaseSource(
                 "source-" + queryId,
                 CollectionSourceFactory.fromList(inputStream, 0L));
-        Operator<Tuple, Tuple> sourceRecorder = addRecorder(
-                query,
-                "record-source-" + queryId,
-                instrumentation,
-                "source");
-
         Operator<Tuple, Tuple> userVisitAggregate = query.addTimeAggregateOperator(
                 "user-visit-" + queryId,
                 settings.userWindowSizeMillis(),
@@ -75,19 +125,9 @@ public final class GeoLifeMobilityMainQuery {
         Operator<Tuple, Tuple> stationaryVisitFilter = query.addFilterOperator(
                 "stationary-visit-" + queryId,
                 tuple -> isStationaryVisit(tuple, settings));
-        Operator<Tuple, Tuple> stationaryVisitRecorder = addRecorder(
-                query,
-                "record-stationary-visit-" + queryId,
-                instrumentation,
-                "stationaryVisit");
         Operator<Tuple, Tuple> cellKeyMapper = query.addMapOperator(
                 "cell-key-" + queryId,
                 tuple -> withCellKey(tuple, settings.gridSizeMeters()));
-        Operator<Tuple, Tuple> cellKeyRecorder = addRecorder(
-                query,
-                "record-cell-key-" + queryId,
-                instrumentation,
-                "cellKey");
         Operator<Tuple, Tuple> cellHotspotAggregate = query.addTimeAggregateOperator(
                 "cell-hotspot-" + queryId,
                 settings.cellWindowSizeMillis(),
@@ -96,43 +136,20 @@ public final class GeoLifeMobilityMainQuery {
         Operator<Tuple, Tuple> hotspotFilter = query.addFilterOperator(
                 "hotspot-filter-" + queryId,
                 tuple -> isHotspot(tuple, settings));
-        Operator<Tuple, Tuple> hotspotRecorder = addRecorder(
-                query,
-                "record-hotspot-" + queryId,
-                instrumentation,
-                "hotspot");
         Sink<Tuple> sink = query.addBaseSink("sink-" + queryId, event -> {
             if (event != null) {
                 outputTuples.add(event);
             }
         });
 
-        query.connect(source, sourceRecorder)
-                .connect(sourceRecorder, userVisitAggregate)
+        query.connect(source, userVisitAggregate)
                 .connect(userVisitAggregate, stationaryVisitFilter)
-                .connect(stationaryVisitFilter, stationaryVisitRecorder)
-                .connect(stationaryVisitRecorder, cellKeyMapper)
-                .connect(cellKeyMapper, cellKeyRecorder)
-                .connect(cellKeyRecorder, cellHotspotAggregate)
+                .connect(stationaryVisitFilter, cellKeyMapper)
+                .connect(cellKeyMapper, cellHotspotAggregate)
                 .connect(cellHotspotAggregate, hotspotFilter)
-                .connect(hotspotFilter, hotspotRecorder)
-                .connect(hotspotRecorder, sink, InactiveBackoff.INSTANCE);
+                .connect(hotspotFilter, sink, InactiveBackoff.INSTANCE);
 
-        runUntilSinkFinishes(query, sink, settings.maxWaitMillis());
-        outputTuples.sort(java.util.Comparator.comparingLong(Tuple::getTimestamp).thenComparing(Tuple::getKey));
-        return new QueryResult(List.copyOf(outputTuples), instrumentation.snapshot());
-    }
-
-    private static Operator<Tuple, Tuple> addRecorder(
-            Query query,
-            String operatorId,
-            StreamFlowInstrumentation instrumentation,
-            String streamName) {
-        int row = instrumentation.registerStream(streamName);
-        return query.addMapOperator(operatorId, tuple -> {
-            instrumentation.record(row, tuple);
-            return tuple;
-        });
+        return new BuiltQuery(outputTuples, sink);
     }
 
     public static void main(String[] args) throws Exception {
@@ -177,15 +194,19 @@ public final class GeoLifeMobilityMainQuery {
                 && tuple.getField("f4") >= settings.minHotspotVisits();
     }
 
-    private static void runUntilSinkFinishes(Query query, Sink<Tuple> sink, long maxWaitMillis) {
+    private static void runUntilSinksFinish(
+            Query query,
+            Collection<? extends Sink<?>> sinks,
+            long maxWaitMillis,
+            String description) {
         query.activate();
         long deadlineMillis = maxWaitMillis <= 0L
                 ? Long.MAX_VALUE
                 : System.currentTimeMillis() + maxWaitMillis;
-        while (sink.isEnabled()) {
+        while (sinks.stream().anyMatch(Sink::isEnabled)) {
             if (System.currentTimeMillis() > deadlineMillis) {
                 query.deActivate();
-                throw new IllegalStateException("GeoLife mobility query did not finish within " + maxWaitMillis + " ms");
+                throw new IllegalStateException(description + " did not finish within " + maxWaitMillis + " ms");
             }
             try {
                 Thread.sleep(1L);
@@ -275,5 +296,11 @@ public final class GeoLifeMobilityMainQuery {
     }
 
     public record QueryResult(List<Tuple> outputTuples, StreamFlowInstrumentation.Snapshot flow) {
+    }
+
+    public record ProvenanceQueryResult(List<Tuple> outputTuples) {
+    }
+
+    private record BuiltQuery(List<Tuple> outputTuples, Sink<Tuple> sink) {
     }
 }
