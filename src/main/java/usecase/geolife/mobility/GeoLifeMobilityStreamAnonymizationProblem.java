@@ -57,6 +57,15 @@ public class GeoLifeMobilityStreamAnonymizationProblem implements
             PrivacyMetricChoice privacyMetricChoice,
             double semanticsF1Threshold,
             int k) {
+        this(inputCsvPath, privacyMetricChoice, semanticsF1Threshold, k, LinkageAttackPrivacy.DEFAULT_TRUE_RANK_MAX);
+    }
+
+    public GeoLifeMobilityStreamAnonymizationProblem(
+            String inputCsvPath,
+            PrivacyMetricChoice privacyMetricChoice,
+            double semanticsF1Threshold,
+            int k,
+            int linkageTrueRankMax) {
         this.inputCsvPath = inputCsvPath;
         this.privacyMetricChoice = privacyMetricChoice;
         this.semanticsF1Threshold = semanticsF1Threshold;
@@ -91,7 +100,8 @@ public class GeoLifeMobilityStreamAnonymizationProblem implements
                         this.inputTuples,
                         k,
                         LINKAGE_ATTACK_QUASI_IDENTIFIER_ATTRIBUTES,
-                        LINKAGE_ATTACK_QUASI_IDENTIFIER_TYPES)
+                        LINKAGE_ATTACK_QUASI_IDENTIFIER_TYPES,
+                        linkageTrueRankMax)
                 : null;
         this.fidelitySimilarity = new StreamFlowSnapshotSimilarity(baselineOutcome.flow());
     }
@@ -150,6 +160,7 @@ public class GeoLifeMobilityStreamAnonymizationProblem implements
                     modifiedEvents);
             case LINKAGE_ATTACK_EXPECTED_SUCCESS -> requireLinkageAttackPrivacy().applyExpectedSuccess(modifiedEvents);
             case LINKAGE_ATTACK_TOP_K_CONTAINMENT -> requireLinkageAttackPrivacy().applyTopKContainment(modifiedEvents);
+            case LINKAGE_ATTACK_TRUE_RANK_SCORE -> requireLinkageAttackPrivacy().applyTrueRankScore(modifiedEvents);
         };
     }
 
@@ -161,7 +172,8 @@ public class GeoLifeMobilityStreamAnonymizationProblem implements
 
     private static boolean usesLinkageAttackMetric(PrivacyMetricChoice privacyMetricChoice) {
         return switch (privacyMetricChoice) {
-            case LINKAGE_ATTACK_EXPECTED_SUCCESS, LINKAGE_ATTACK_TOP_K_CONTAINMENT -> true;
+            case LINKAGE_ATTACK_EXPECTED_SUCCESS, LINKAGE_ATTACK_TOP_K_CONTAINMENT,
+                    LINKAGE_ATTACK_TRUE_RANK_SCORE -> true;
             case K_ANONYMITY_CARDINALITY, K_ANONYMITY_CARDINALITY_MAX, K_ANONYMITY_CARDINALITY_Q99 -> false;
         };
     }
@@ -169,7 +181,8 @@ public class GeoLifeMobilityStreamAnonymizationProblem implements
     private static boolean usesKAnonymityMetric(PrivacyMetricChoice privacyMetricChoice) {
         return switch (privacyMetricChoice) {
             case K_ANONYMITY_CARDINALITY, K_ANONYMITY_CARDINALITY_MAX, K_ANONYMITY_CARDINALITY_Q99 -> true;
-            case LINKAGE_ATTACK_EXPECTED_SUCCESS, LINKAGE_ATTACK_TOP_K_CONTAINMENT -> false;
+            case LINKAGE_ATTACK_EXPECTED_SUCCESS, LINKAGE_ATTACK_TOP_K_CONTAINMENT,
+                    LINKAGE_ATTACK_TRUE_RANK_SCORE -> false;
         };
     }
 

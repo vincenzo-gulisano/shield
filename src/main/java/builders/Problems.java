@@ -19,6 +19,7 @@ package builders;
 import io.github.ericmedvet.jnb.core.Cacheable;
 import io.github.ericmedvet.jnb.core.Discoverable;
 import io.github.ericmedvet.jnb.core.Param;
+import metrics.privacy.LinkageAttackPrivacy;
 import problem.StreamAnonymizationProblem;
 import problem.StreamAnonymizationProblem_2ObjectivesPerf;
 import problem.StreamAnonymizationProblem_2ObjectivesRes;
@@ -51,13 +52,15 @@ public class Problems {
             @Param(value = "privacyMetric", dS = "LINKAGE_ATTACK_TOP_K_CONTAINMENT") PrivacyMetricChoice privacyMetric,
             @Param(value = "semanticsF1Threshold", dD = 0.05) double semanticsF1Threshold,
             @Param(value = "k", dI = 10) int k,
+            @Param(value = "linkageTrueRankMax", dI = LinkageAttackPrivacy.DEFAULT_TRUE_RANK_MAX) int linkageTrueRankMax,
             @Param(value = "name", iS = "{inputCsvPath}") String name) {
 
         return new LclFlowStreamAnonymizationProblem(
                 inputCsvPath,
                 privacyMetric,
                 semanticsF1Threshold,
-                k);
+                k,
+                linkageTrueRankMax);
     }
 
     @Cacheable
@@ -66,13 +69,15 @@ public class Problems {
             @Param(value = "privacyMetric", dS = "LINKAGE_ATTACK_TOP_K_CONTAINMENT") PrivacyMetricChoice privacyMetric,
             @Param(value = "semanticsF1Threshold", dD = 0.05) double semanticsF1Threshold,
             @Param(value = "k", dI = 10) int k,
+            @Param(value = "linkageTrueRankMax", dI = LinkageAttackPrivacy.DEFAULT_TRUE_RANK_MAX) int linkageTrueRankMax,
             @Param(value = "name", iS = "{inputCsvPath}") String name) {
 
         return new GeoLifeMobilityStreamAnonymizationProblem(
                 inputCsvPath,
                 privacyMetric,
                 semanticsF1Threshold,
-                k);
+                k,
+                linkageTrueRankMax);
     }
 
     // Create a problem with 2 objectives: results similarity and privacy

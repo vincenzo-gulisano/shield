@@ -22,9 +22,12 @@ import usecase.common.Tuple;
  */
 public class LinkageAttackPrivacy {
 
+    public static final int DEFAULT_TRUE_RANK_MAX = 50;
+
     private static final double EPSILON = 1e-12;
 
     private final int k;
+    private final int trueRankMax;
     private final List<String> attributes;
     private final Map<String, FieldType> attributeTypes;
     private final Map<String, Double> inverseStds;
@@ -42,13 +45,26 @@ public class LinkageAttackPrivacy {
             int k,
             List<String> attributes,
             Map<String, FieldType> attributeTypes) {
+        this(originalStream, k, attributes, attributeTypes, DEFAULT_TRUE_RANK_MAX);
+    }
+
+    public LinkageAttackPrivacy(
+            List<? extends Tuple> originalStream,
+            int k,
+            List<String> attributes,
+            Map<String, FieldType> attributeTypes,
+            int trueRankMax) {
         if (originalStream == null || originalStream.isEmpty()) {
             throw new IllegalArgumentException("Original stream cannot be null or empty");
         }
         if (k < 1) {
             throw new IllegalArgumentException("k must be at least 1");
         }
+        if (trueRankMax < 1) {
+            throw new IllegalArgumentException("trueRankMax must be at least 1");
+        }
         this.k = k;
+        this.trueRankMax = Math.max(k, trueRankMax);
         this.attributes = List.copyOf(attributes);
         this.attributeTypes = validateAttributeTypes(this.attributes, attributeTypes);
 
@@ -120,6 +136,40 @@ public class LinkageAttackPrivacy {
         return apply(modifiedStream, true);
     }
 
+    /**
+     * True-rank linkage privacy.
+     *
+     * <p>For each released tuple {@code y}, the metric finds the nearest-neighbor rank {@code k'}
+     * needed to include its true original tuple {@code x} when original tuples are ordered around
+     * {@code y}. If {@code k' <= k}, the tuple still has full attack risk and contributes privacy
+     * {@code 0}. Otherwise, the attack risk is {@code 1 / k'}, so the tuple contributes privacy
+     * {@code 1 - 1 / k'}. Ranks are capped at {@code trueRankMax} to keep the KD-tree path bounded.
+     * Duplicates in the modified stream are grouped by linkage id and count once, using the most
+     * revealing duplicate.
+     */
+    public double applyTrueRankScore(List<? extends Tuple> modifiedStream) {
+        if (modifiedStream == null) {
+            return 0.0;
+        }
+        Map<Long, Double> maxRiskByLinkageId = new LinkedHashMap<>();
+        for (Tuple tuple : modifiedStream) {
+            long linkageId = requireLinkageId(tuple);
+            if (!originalVectorsByLinkageId.containsKey(linkageId)) {
+                throw new IllegalArgumentException("Unknown modified tuple linkage id: " + linkageId);
+            }
+            double risk = trueRankAttackRisk(tuple, linkageId);
+            maxRiskByLinkageId.merge(linkageId, risk, Math::max);
+        }
+        if (maxRiskByLinkageId.isEmpty()) {
+            return 1.0;
+        }
+        double totalRisk = 0.0;
+        for (double risk : maxRiskByLinkageId.values()) {
+            totalRisk += risk;
+        }
+        return Math.max(0.0, Math.min(1.0, 1.0 - totalRisk / maxRiskByLinkageId.size()));
+    }
+
     private double apply(List<? extends Tuple> modifiedStream, boolean topKContainment) {
         if (modifiedStream == null) {
             return 0.0;
@@ -162,6 +212,96 @@ public class LinkageAttackPrivacy {
             return 0.0;
         }
         return topKContainment ? 1.0 : 1.0 / nearestDistances.size();
+    }
+
+    private double trueRankAttackRisk(Tuple modifiedTuple, long linkageId) {
+        double[] modifiedVector = toVector(modifiedTuple);
+        if (MetricUtils.isAllNaN(modifiedVector)) {
+            return 0.0;
+        }
+        double[] trueOriginalVector = originalVectorsByLinkageId.get(linkageId);
+        int trueRank = trueOriginalRank(modifiedVector, trueOriginalVector);
+        if (trueRank < 1) {
+            return 0.0;
+        }
+        if (trueRank <= k) {
+            return 1.0;
+        }
+        return 1.0 / trueRank;
+    }
+
+    private int trueOriginalRank(double[] modifiedVector, double[] trueOriginalVector) {
+        if (originalTree != null) {
+            return trueOriginalRankWithTree(modifiedVector, trueOriginalVector);
+        }
+        return trueOriginalRankByScan(modifiedVector, trueOriginalVector);
+    }
+
+    private int trueOriginalRankWithTree(double[] modifiedVector, double[] trueOriginalVector) {
+        int maxRank = Math.min(trueRankMax, originalVectors.size());
+        int topKLimit = Math.min(k, maxRank);
+        if (containsTrueOriginalInNearest(modifiedVector, trueOriginalVector, topKLimit)) {
+            return topKLimit;
+        }
+        if (topKLimit >= maxRank) {
+            return maxRank;
+        }
+
+        List<double[]> cappedNearest = originalTree.findNearestPoints(modifiedVector, maxRank);
+        if (!containsByReference(cappedNearest, trueOriginalVector)) {
+            return maxRank;
+        }
+        cappedNearest.sort(Comparator.comparingDouble(candidate -> calculateMeanDistance(modifiedVector, candidate)));
+        for (int i = 0; i < cappedNearest.size(); i++) {
+            if (cappedNearest.get(i) == trueOriginalVector) {
+                return i + 1;
+            }
+        }
+        return maxRank;
+    }
+
+    private boolean containsTrueOriginalInNearest(
+            double[] modifiedVector,
+            double[] trueOriginalVector,
+            int limit) {
+        if (limit < 1) {
+            return false;
+        }
+        for (double[] candidate : originalTree.findNearestPoints(modifiedVector, limit)) {
+            if (candidate == trueOriginalVector) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean containsByReference(List<double[]> candidates, double[] target) {
+        for (double[] candidate : candidates) {
+            if (candidate == target) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private int trueOriginalRankByScan(double[] modifiedVector, double[] trueOriginalVector) {
+        double trueDistance = calculateMeanDistance(modifiedVector, trueOriginalVector);
+        if (Double.isNaN(trueDistance) || Double.isInfinite(trueDistance)) {
+            return 0;
+        }
+        int rank = 0;
+        for (double[] originalVector : originalVectors) {
+            double distance = calculateMeanDistance(modifiedVector, originalVector);
+            if (!Double.isNaN(distance)
+                    && !Double.isInfinite(distance)
+                    && distance <= trueDistance + EPSILON) {
+                rank++;
+                if (rank >= trueRankMax) {
+                    return trueRankMax;
+                }
+            }
+        }
+        return rank;
     }
 
     private double[] toVector(Tuple tuple) {

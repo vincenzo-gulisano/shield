@@ -16,5 +16,8 @@ public enum PrivacyMetricChoice {
     LINKAGE_ATTACK_EXPECTED_SUCCESS,
 
     // Top-k shortlist linkage attack: true id in the top-k nearest candidates contributes full risk
-    LINKAGE_ATTACK_TOP_K_CONTAINMENT
+    LINKAGE_ATTACK_TOP_K_CONTAINMENT,
+
+    // True-rank linkage attack: risk is 1 when true rank <= k, otherwise 1 / true rank
+    LINKAGE_ATTACK_TRUE_RANK_SCORE
 }

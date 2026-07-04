@@ -190,6 +190,7 @@ public class TupleStreamAnonymizationProblem implements
             case K_ANONYMITY_CARDINALITY -> requireKAnonymityCalculator().apply(inputTuples, modifiedEvents);
             case LINKAGE_ATTACK_EXPECTED_SUCCESS -> requireLinkageAttackCalculator().applyExpectedSuccess(modifiedEvents);
             case LINKAGE_ATTACK_TOP_K_CONTAINMENT -> requireLinkageAttackCalculator().applyTopKContainment(modifiedEvents);
+            case LINKAGE_ATTACK_TRUE_RANK_SCORE -> requireLinkageAttackCalculator().applyTrueRankScore(modifiedEvents);
         };
     }
 
@@ -210,13 +211,15 @@ public class TupleStreamAnonymizationProblem implements
     private static boolean usesKAnonymityMetric(PrivacyMetricChoice privacyMetricChoice) {
         return switch (privacyMetricChoice) {
             case K_ANONYMITY_CARDINALITY, K_ANONYMITY_CARDINALITY_MAX, K_ANONYMITY_CARDINALITY_Q99 -> true;
-            case LINKAGE_ATTACK_EXPECTED_SUCCESS, LINKAGE_ATTACK_TOP_K_CONTAINMENT -> false;
+            case LINKAGE_ATTACK_EXPECTED_SUCCESS, LINKAGE_ATTACK_TOP_K_CONTAINMENT,
+                    LINKAGE_ATTACK_TRUE_RANK_SCORE -> false;
         };
     }
 
     private static boolean usesLinkageAttackMetric(PrivacyMetricChoice privacyMetricChoice) {
         return switch (privacyMetricChoice) {
-            case LINKAGE_ATTACK_EXPECTED_SUCCESS, LINKAGE_ATTACK_TOP_K_CONTAINMENT -> true;
+            case LINKAGE_ATTACK_EXPECTED_SUCCESS, LINKAGE_ATTACK_TOP_K_CONTAINMENT,
+                    LINKAGE_ATTACK_TRUE_RANK_SCORE -> true;
             case K_ANONYMITY_CARDINALITY, K_ANONYMITY_CARDINALITY_MAX, K_ANONYMITY_CARDINALITY_Q99 -> false;
         };
     }

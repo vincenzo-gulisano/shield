@@ -6,6 +6,9 @@ import java.util.List;
 
 // KDTree Implementation
 public class KDTree {
+    private record Neighbor(double distance, double[] point) {
+    }
+
     private static class Node {
         double[] point;
         int axis;
@@ -70,6 +73,16 @@ public class KDTree {
         return distances;
     }
 
+    public List<double[]> findNearestPoints(double[] target, int k) {
+        BoundedNeighborMaxHeap nearestNeighbors = findNearestNeighborHeap(target, k);
+        List<Neighbor> values = nearestNeighbors.toList();
+        List<double[]> points = new ArrayList<>(values.size());
+        for (Neighbor value : values) {
+            points.add(value.point());
+        }
+        return points;
+    }
+
     public double findNearestDistanceStdDev(double[] target, int k) {
         BoundedMaxHeap nearestDistances = findNearestDistanceHeap(target, k);
         if (nearestDistances.size() < 2) {
@@ -85,6 +98,15 @@ public class KDTree {
         BoundedMaxHeap nearestDistances = new BoundedMaxHeap(k);
         searchKNearest(root, target, nearestDistances);
         return nearestDistances;
+    }
+
+    private BoundedNeighborMaxHeap findNearestNeighborHeap(double[] target, int k) {
+        if (k < 1) {
+            throw new IllegalArgumentException("k must be positive");
+        }
+        BoundedNeighborMaxHeap nearestNeighbors = new BoundedNeighborMaxHeap(k);
+        searchKNearest(root, target, nearestNeighbors);
+        return nearestNeighbors;
     }
 
     // Search for the k nearest tuples with pruning
@@ -128,6 +150,40 @@ public class KDTree {
             mustVisitFar = true;
         if (!mustVisitFar && far == node.right && node.rightHasNaNs) mustVisitFar = true;
         if (mustVisitFar) searchKNearest(far, target, nearestDistances);
+    }
+
+    private void searchKNearest(Node node, double[] target, BoundedNeighborMaxHeap nearestNeighbors) {
+        if (node == null) return;
+
+        double distSq = calculateMeanDistance(target, node.point);
+        if (!Double.isNaN(distSq) && !Double.isInfinite(distSq)) {
+            nearestNeighbors.offer(distSq, node.point);
+        }
+
+        int axis = node.axis;
+        double targetVal = target[axis];
+        double nodeVal = node.point[axis];
+
+        if (Double.isNaN(targetVal) || Double.isNaN(nodeVal)) {
+            searchKNearest(node.left, target, nearestNeighbors);
+            searchKNearest(node.right, target, nearestNeighbors);
+            return;
+        }
+
+        double diff = targetVal - nodeVal;
+        double diffSq = diff * diff;
+        Node near = diff < 0 ? node.left : node.right;
+        Node far = diff < 0 ? node.right : node.left;
+
+        searchKNearest(near, target, nearestNeighbors);
+
+        boolean mustVisitFar = false;
+        if (!nearestNeighbors.isFull())
+            mustVisitFar = true;
+        else if (diffSq < (nearestNeighbors.maxDistance() * maxDims))
+            mustVisitFar = true;
+        if (!mustVisitFar && far == node.right && node.rightHasNaNs) mustVisitFar = true;
+        if (mustVisitFar) searchKNearest(far, target, nearestNeighbors);
     }
 
     // Calculate Mean Squared Distance
@@ -227,6 +283,75 @@ public class KDTree {
 
         private void swap(int a, int b) {
             double tmp = values[a];
+            values[a] = values[b];
+            values[b] = tmp;
+        }
+    }
+
+    private static final class BoundedNeighborMaxHeap {
+        private final Neighbor[] values;
+        private int size;
+
+        private BoundedNeighborMaxHeap(int capacity) {
+            values = new Neighbor[capacity];
+        }
+
+        private void offer(double distance, double[] point) {
+            Neighbor neighbor = new Neighbor(distance, point);
+            if (size < values.length) {
+                values[size] = neighbor;
+                siftUp(size);
+                size++;
+            } else if (distance < values[0].distance()) {
+                values[0] = neighbor;
+                siftDown(0);
+            }
+        }
+
+        private boolean isFull() {
+            return size == values.length;
+        }
+
+        private double maxDistance() {
+            return values[0].distance();
+        }
+
+        private List<Neighbor> toList() {
+            return new ArrayList<>(Arrays.asList(Arrays.copyOf(values, size)));
+        }
+
+        private void siftUp(int index) {
+            while (index > 0) {
+                int parent = (index - 1) / 2;
+                if (values[parent].distance() >= values[index].distance()) {
+                    return;
+                }
+                swap(parent, index);
+                index = parent;
+            }
+        }
+
+        private void siftDown(int index) {
+            while (true) {
+                int left = index * 2 + 1;
+                int right = left + 1;
+                int largest = index;
+                if (left < size && values[left].distance() > values[largest].distance()) {
+                    largest = left;
+                }
+                if (right < size && values[right].distance() > values[largest].distance()) {
+                    largest = right;
+                }
+                if (largest == index) {
+                    return;
+                }
+                swap(index, largest);
+                index = largest;
+            }
+        }
+
+        private void swap(int a, int b) {
+            Neighbor tmp = values[a];
             values[a] = values[b];
             values[b] = tmp;
         }
