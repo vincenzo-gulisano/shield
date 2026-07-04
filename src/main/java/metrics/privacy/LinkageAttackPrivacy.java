@@ -60,8 +60,8 @@ public class LinkageAttackPrivacy {
         if (k < 1) {
             throw new IllegalArgumentException("k must be at least 1");
         }
-        if (trueRankMax < 1) {
-            throw new IllegalArgumentException("trueRankMax must be at least 1");
+        if (trueRankMax < k) {
+            throw new IllegalArgumentException("trueRankMax must be at least k");
         }
         this.k = k;
         this.trueRankMax = Math.max(k, trueRankMax);
