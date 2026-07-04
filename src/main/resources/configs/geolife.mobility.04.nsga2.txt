@@ -5,9 +5,9 @@ $imgType = svg
 $nPop = 100
 
 ea.experiment(
-  runs = (randomGenerator = (seed = [1:1:3])
+  runs = (randomGenerator = (seed = [1:1:5])
     * [m.defaultRG()])
-    * (solver = (stop = ea.sc.nOfQualityEvaluations(n = 2000))
+    * (solver = (stop = ea.sc.nOfQualityEvaluations(n = 20000))
     * [
       ea.s.nsga2(
         nPop = $nPop;

@@ -1,0 +1,14 @@
+java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 1 -f src/main/resources/configs/lcl.flow.01.nsga2.txt
+java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 1 -f src/main/resources/configs/lcl.flow.02.nsga2.txt
+java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 1 -f src/main/resources/configs/lcl.flow.02.true-rank.nsga2.txt
+java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 1 -f src/main/resources/configs/lcl.flow.04.nsga2.txt
+java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 1 -f src/main/resources/configs/lcl.flow.04.true-rank.nsga2.txt
+java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 1 -f src/main/resources/configs/lcl.flow.08.nsga2.txt
+java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 1 -f src/main/resources/configs/lcl.flow.08.true-rank.nsga2.txt
+java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 1 -f src/main/resources/configs/geolife.mobility.01.nsga2.txt
+java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 1 -f src/main/resources/configs/geolife.mobility.02.nsga2.txt
+java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 1 -f src/main/resources/configs/geolife.mobility.02.true-rank.nsga2.txt
+java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 1 -f src/main/resources/configs/geolife.mobility.04.nsga2.txt
+java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 1 -f src/main/resources/configs/geolife.mobility.04.true-rank.nsga2.txt
+java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 1 -f src/main/resources/configs/geolife.mobility.08.nsga2.txt
+java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 1 -f src/main/resources/configs/geolife.mobility.08.true-rank.nsga2.txt
