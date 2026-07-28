@@ -1,7 +1,7 @@
 package mappers;
 
 import io.github.ericmedvet.jgea.core.InvertibleMapper;
-import io.github.ericmedvet.jgea.core.representation.tree.Tree;
+import io.github.ericmedvet.jnb.datastructure.Tree;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,6 +35,6 @@ public class Mapper implements InvertibleMapper<Tree<String>, QueryRepresentatio
 
     @Override
     public Tree<String> exampleFor(QueryRepresentation queryRepresentation) {
-        return Tree.of("<pipeline>");
+        return new Tree<>("<pipeline>");
     }
 }

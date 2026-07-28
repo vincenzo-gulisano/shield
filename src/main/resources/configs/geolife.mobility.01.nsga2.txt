@@ -5,16 +5,16 @@ $imgType = svg
 $nPop = 100
 
 ea.experiment(
-  runs = (randomGenerator = (seed = [1:1:30])
+  runs = (randomGenerator = (seed = [1:1:1])
     * [m.defaultRG()])
-    * (solver = (stop = ea.sc.nOfQualityEvaluations(n = 20000))
+    * (solver = (stop = ea.sc.nOfQualityEvaluations(n = 500))
     * [
       ea.s.nsga2(
         nPop = $nPop;
         representation = ea.r.cfgTree(
           minTreeH = $minTreeH;
           maxTreeH = $maxTreeH;
-          grammar = ea.grammar.fromFile(
+          grammar = ea.grammar.string.fromFile(
             path = "src/main/resources/grammars/geolife/geolife.mobility.01.bnf"));
         mapper = anonym.mapper.queryMapperWithSampler(
           fieldValueSampler = anonym.valueSampler.geoLifeTupleFieldValueSampler(
@@ -45,32 +45,43 @@ ea.experiment(
         f.mapValue(key = privacy; of = ea.f.quality(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality()))));
         f.mapValue(key = "semantics"; of = ea.f.quality(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality()))));
         f.mapValue(key = "fidelity"; of = ea.f.quality(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality()))));
-        ea.f.solution(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality())));
+        % ea.f.solution(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality())));
 
         f.mapValue(key = privacy; of = ea.f.quality(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = "semantics"; of = ea.f.quality()))));
         f.mapValue(key = "semantics"; of = ea.f.quality(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = "semantics"; of = ea.f.quality()))));
         f.mapValue(key = "fidelity"; of = ea.f.quality(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = "semantics"; of = ea.f.quality()))));
-        ea.f.solution(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = "semantics"; of = ea.f.quality())));
+        % ea.f.solution(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = "semantics"; of = ea.f.quality())));
 
         f.mapValue(key = privacy; of = ea.f.quality(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = "fidelity"; of = ea.f.quality()))));
         f.mapValue(key = "semantics"; of = ea.f.quality(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = "fidelity"; of = ea.f.quality()))));
         f.mapValue(key = "fidelity"; of = ea.f.quality(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = "fidelity"; of = ea.f.quality()))));
-        ea.f.solution(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = "fidelity"; of = ea.f.quality())));
+        % ea.f.solution(of = f.percentile(p = 100; of = ea.f.all(); by = f.mapValue(key = "fidelity"; of = ea.f.quality())));
 
         f.mapValue(key = privacy; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality()))));
         f.mapValue(key = "semantics"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality()))));
         f.mapValue(key = "fidelity"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality()))));
-        ea.f.solution(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality())));
+        % ea.f.solution(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality())));
 
         f.mapValue(key = privacy; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "semantics"; of = ea.f.quality()))));
         f.mapValue(key = "semantics"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "semantics"; of = ea.f.quality()))));
         f.mapValue(key = "fidelity"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "semantics"; of = ea.f.quality()))));
-        ea.f.solution(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "semantics"; of = ea.f.quality())));
+        % ea.f.solution(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "semantics"; of = ea.f.quality())));
 
         f.mapValue(key = privacy; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "fidelity"; of = ea.f.quality()))));
         f.mapValue(key = "semantics"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "fidelity"; of = ea.f.quality()))));
-        f.mapValue(key = "fidelity"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "fidelity"; of = ea.f.quality()))));
-        ea.f.solution(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "fidelity"; of = ea.f.quality())))
+        f.mapValue(key = "fidelity"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "fidelity"; of = ea.f.quality()))))
+        % ea.f.solution(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "fidelity"; of = ea.f.quality())))
+      ]
+    );
+    ea.l.firstsCsv(
+      path = $basePath + "final-firsts.csv";
+      onlyLast = true;
+      ieFunctions = [
+        ea.f.genotype();
+        ea.f.solution();
+        f.mapValue(key = privacy; of = ea.f.quality());
+        f.mapValue(key = semantics; of = ea.f.quality());
+        f.mapValue(key = fidelity; of = ea.f.quality())
       ]
     );
     ea.l.savePlotForRun(

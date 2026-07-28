@@ -16,9 +16,7 @@
 
 package mappers;
 
-import static mappers.utils.TreeUtils.findFirstTerminal;
-
-import io.github.ericmedvet.jgea.core.representation.tree.Tree;
+import io.github.ericmedvet.jnb.datastructure.Tree;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,10 +34,10 @@ public class TreeToRepresentation {
         Tree<String> operatorNode = null;
         Tree<String> nextPipelineNode = null;
 
-        for (Tree<String> child : pipelineNode) {
-            if ("<operator>".equals(child.content())) {
+        for (Tree<String> child : pipelineNode.children()) {
+            if ("<operator>".equals(child.label())) {
                 operatorNode = child;
-            } else if ("<pipeline>".equals(child.content())) {
+            } else if ("<pipeline>".equals(child.label())) {
                 nextPipelineNode = child;
             }
         }
@@ -53,7 +51,7 @@ public class TreeToRepresentation {
         QueryRepresentation.OperatorNode operator = null;
 
         // Call the correct parsing method based on the operator type
-        switch (specificOpNode.content()) {
+        switch (specificOpNode.label()) {
             case "<filter>" -> operator = parseFilterNode(specificOpNode);
             case "<map_duplicate>" -> operator = parseMapDuplicateNode(specificOpNode);
             case "<map_noise>" -> operator = parseMapNoiseNode(specificOpNode);
@@ -62,9 +60,9 @@ public class TreeToRepresentation {
             case "<map_timestamp_pairwise_swap>", "<map_timestamp_pairwise_swap_nominal>",
                     "<map_timestamp_pairwise_swap_discrete_numeric>",
                     "<map_timestamp_pairwise_swap_continuous_numeric>" ->
-                    logger.warn("Ignoring graph-only operator in legacy representation: {}", specificOpNode.content());
+                    logger.warn("Ignoring graph-only operator in legacy representation: {}", specificOpNode.label());
             // TODO ideally, here you should handle also "<fork_ops_join>"
-            default -> logger.warn("Unknown operator type found in grammar tree: {}", specificOpNode.content());
+            default -> logger.warn("Unknown operator type found in grammar tree: {}", specificOpNode.label());
         }
 
         if (operator != null) {
@@ -85,10 +83,10 @@ public class TreeToRepresentation {
         Tree<String> valueNode = null;
 
         // Search for the children in the node
-        for (Tree<String> child : filterNode) {
-            switch (child.content()) {
-                case "<attribute>" -> attribute = findFirstTerminal(child);
-                case "<condition>" -> conditionString = findFirstTerminal(child);
+        for (Tree<String> child : filterNode.children()) {
+            switch (child.label()) {
+                case "<attribute>" -> attribute = child.leafLabels().getFirst();
+                case "<condition>" -> conditionString = child.leafLabels().getFirst();
                 case "<value>" -> valueNode = child;
             }
         }
@@ -99,7 +97,7 @@ public class TreeToRepresentation {
         // Mapping from tree to Pipeline Representation
         try {
             // Collect all the leaves (digit and .) under the node <value> and join them to reconstruct the number
-            List<String> leaves = valueNode.visitLeaves();
+            List<String> leaves = valueNode.leafLabels();
             String valueString = String.join("", leaves).replace("'", "");
             double value = Double.parseDouble(valueString);
             attribute = attribute.replace("'", "");
@@ -119,7 +117,7 @@ public class TreeToRepresentation {
         try{
             // Search for the child <probability> in the node
             Tree<String> probNode = mapNode.child(0);
-            String attribute = findFirstTerminal(probNode);
+            String attribute = probNode.leafLabels().getFirst();
             // Create the specific arguments object for a RIR map
             QueryRepresentation.MapRIRArgs args = new QueryRepresentation.MapRIRArgs(attribute);
 
@@ -137,10 +135,10 @@ public class TreeToRepresentation {
         String percentageString = null;
 
         // Search for the children in the node
-        for (Tree<String> child : mapNode) {
-            switch (child.content()) {
-                case "<attribute>" -> attribute = findFirstTerminal(child);
-                case "<percentage>" -> percentageString = findFirstTerminal(child);
+        for (Tree<String> child : mapNode.children()) {
+            switch (child.label()) {
+                case "<attribute>" -> attribute = child.leafLabels().getFirst();
+                case "<percentage>" -> percentageString = child.leafLabels().getFirst();
             }
         }
 
@@ -163,8 +161,8 @@ public class TreeToRepresentation {
         try{
             // Search for the child <probability> in the node
             Tree<String> probNode = mapNode.child(0);
-            String probString = findFirstTerminal(probNode);
-            Double probValue = Double.parseDouble(probString);
+            String probString = probNode.leafLabels().getFirst();
+            double probValue = Double.parseDouble(probString);
             // Create the specific arguments object for a duplicate map
             QueryRepresentation.MapDuplicateArgs args = new QueryRepresentation.MapDuplicateArgs(probValue);
 
@@ -183,11 +181,11 @@ public class TreeToRepresentation {
         String windowString = null;
 
         // Search for the children in the node
-        for (Tree<String> child : mapNode) {
-            switch (child.content()) {
-                case "<attribute>" -> attribute = findFirstTerminal(child);
-                case "<agg_fun>" -> functionString = findFirstTerminal(child);
-                case "<window_size>" -> windowString = findFirstTerminal(child);
+        for (Tree<String> child : mapNode.children()) {
+            switch (child.label()) {
+                case "<attribute>" -> attribute = child.leafLabels().getFirst();
+                case "<agg_fun>" -> functionString = child.leafLabels().getFirst();
+                case "<window_size>" -> windowString = child.leafLabels().getFirst();
             }
         }
 

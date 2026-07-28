@@ -3,7 +3,7 @@ package usecase.geolife.mobility;
 import io.github.ericmedvet.jgea.core.representation.graph.Graph;
 import io.github.ericmedvet.jgea.core.representation.graph.Graph.Arc;
 import io.github.ericmedvet.jgea.core.representation.graph.LinkedHashGraph;
-import io.github.ericmedvet.jgea.core.representation.tree.Tree;
+import io.github.ericmedvet.jnb.datastructure.Tree;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
@@ -146,6 +146,6 @@ public final class GeoLifeMobilityContributorConditionSmokeTest {
 
     @SafeVarargs
     private static Tree<String> tree(String content, Tree<String>... children) {
-        return Tree.of(content, List.of(children));
+        return new Tree<>(content, List.of(children));
     }
 }
