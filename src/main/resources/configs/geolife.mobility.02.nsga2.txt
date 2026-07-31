@@ -73,7 +73,18 @@ ea.experiment(
         ea.f.solution(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "fidelity"; of = ea.f.quality())))
       ]
     );
-    ea.l.savePlotForRun(
+    ea.l.firstsCsv(
+      path = $basePath + "final-firsts.csv";
+      onlyLast = true;
+      ieFunctions = [
+        ea.f.genotype();
+        ea.f.solution();
+        f.mapValue(key = privacy; of = ea.f.quality());
+        f.mapValue(key = semantics; of = ea.f.quality());
+        f.mapValue(key = fidelity; of = ea.f.quality())
+      ]
+    );
+    ea.l.savePlotAndCsvForRun(
       path = $basePath + "{randomGenerator.seed}." + "scatter-fidelity-vs-semantics.svg";
       plot = ea.plot.single.biObjectivePopulation(
         x = f.mapValue(key = "fidelity"; of = ea.f.quality());
@@ -83,7 +94,7 @@ ea.experiment(
       secondary = true;
       type = svg
     );
-    ea.l.savePlotForRun(
+    ea.l.savePlotAndCsvForRun(
       path = $basePath + "{randomGenerator.seed}." + "scatter-privacy-vs-semantics.svg";
       plot = ea.plot.single.biObjectivePopulation(
         x = f.mapValue(key = privacy; of = ea.f.quality());
@@ -93,7 +104,7 @@ ea.experiment(
       secondary = true;
       type = svg
     );
-    ea.l.savePlotForRun(
+    ea.l.savePlotAndCsvForRun(
       path = $basePath + "{randomGenerator.seed}." + "scatter-fidelity-vs-privacy.svg";
       plot = ea.plot.single.biObjectivePopulation(
         x = f.mapValue(key = "fidelity"; of = ea.f.quality());
@@ -103,7 +114,7 @@ ea.experiment(
       secondary = true;
       type = svg
     );
-    ea.l.savePlotForExp(
+    ea.l.savePlotAndCsvForExp(
       path = $basePath + "p75privacy-semantics.svg";
       plot = ea.plot.multi.xyExp(
         y = f.mapValue(key = "semantics"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality()))))
@@ -111,7 +122,7 @@ ea.experiment(
       configuration = viz.plot.conf.image(axesShow = all; axesIndependences = [all]);
       type = svg
     );
-    ea.l.savePlotForExp(
+    ea.l.savePlotAndCsvForExp(
       path = $basePath + "p75privacy-fidelity.svg";
       plot = ea.plot.multi.xyExp(
         y = f.mapValue(key = "fidelity"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = privacy; of = ea.f.quality()))))
@@ -119,7 +130,7 @@ ea.experiment(
       configuration = viz.plot.conf.image(axesShow = all; axesIndependences = [all]);
       type = svg
     );
-    ea.l.savePlotForExp(
+    ea.l.savePlotAndCsvForExp(
       path = $basePath + "p75semantics-privacy.svg";
       plot = ea.plot.multi.xyExp(
         y = f.mapValue(key = "privacy"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "semantics"; of = ea.f.quality()))))
@@ -127,7 +138,7 @@ ea.experiment(
       configuration = viz.plot.conf.image(axesShow = all; axesIndependences = [all]);
       type = svg
     );
-    ea.l.savePlotForExp(
+    ea.l.savePlotAndCsvForExp(
       path = $basePath + "p75semantics-fidelity.svg";
       plot = ea.plot.multi.xyExp(
         y = f.mapValue(key = "fidelity"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "semantics"; of = ea.f.quality()))))
@@ -135,7 +146,7 @@ ea.experiment(
       configuration = viz.plot.conf.image(axesShow = all; axesIndependences = [all]);
       type = svg
     );
-    ea.l.savePlotForExp(
+    ea.l.savePlotAndCsvForExp(
       path = $basePath + "p75fidelity-privacy.svg";
       plot = ea.plot.multi.xyExp(
         y = f.mapValue(key = privacy; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "fidelity"; of = ea.f.quality()))))
@@ -143,7 +154,7 @@ ea.experiment(
       configuration = viz.plot.conf.image(axesShow = all; axesIndependences = [all]);
       type = svg
     );
-    ea.l.savePlotForExp(
+    ea.l.savePlotAndCsvForExp(
       path = $basePath + "p75fidelity-semantics.svg";
       plot = ea.plot.multi.xyExp(
         y = f.mapValue(key = "semantics"; of = ea.f.quality(of = f.percentile(p = 75; of = ea.f.all(); by = f.mapValue(key = "fidelity"; of = ea.f.quality()))))
@@ -151,19 +162,19 @@ ea.experiment(
       configuration = viz.plot.conf.image(axesShow = all; axesIndependences = [all]);
       type = svg
     );
-    ea.l.savePlotForExp(
+    ea.l.savePlotAndCsvForExp(
           path = $basePath + "p75-privacy.svg";
           plot = ea.plot.multi.xyExp(y = f.percentile(p = 75; of = f.each(of = ea.f.all(); mapF = f.mapValue(key = privacy; of = ea.f.quality()))));
           configuration = viz.plot.conf.image(axesShow = all; axesIndependences = [all]);
           type = svg
     );
-    ea.l.savePlotForExp(
+    ea.l.savePlotAndCsvForExp(
           path = $basePath + "p75-semantics.svg";
           plot = ea.plot.multi.xyExp(y = f.percentile(p = 75; of = f.each(of = ea.f.all(); mapF = f.mapValue(key = "semantics"; of = ea.f.quality()))));
           configuration = viz.plot.conf.image(axesShow = all; axesIndependences = [all]);
           type = svg
     );
-    ea.l.savePlotForExp(
+    ea.l.savePlotAndCsvForExp(
           path = $basePath + "p75-fidelity.svg";
           plot = ea.plot.multi.xyExp(y = f.percentile(p = 75; of = f.each(of = ea.f.all(); mapF = f.mapValue(key = "fidelity"; of = ea.f.quality()))));
           configuration = viz.plot.conf.image(axesShow = all; axesIndependences = [all]);
