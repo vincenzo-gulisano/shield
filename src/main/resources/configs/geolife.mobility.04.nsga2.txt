@@ -14,7 +14,7 @@ ea.experiment(
         representation = ea.r.cfgTree(
           minTreeH = $minTreeH;
           maxTreeH = $maxTreeH;
-          grammar = ea.grammar.fromFile(
+          grammar = ea.grammar.string.fromFile(
             path = "src/main/resources/grammars/geolife/geolife.mobility.04.bnf"));
         mapper = anonym.mapper.queryMapperWithSampler(
           fieldValueSampler = anonym.valueSampler.geoLifeTupleFieldValueSampler(
