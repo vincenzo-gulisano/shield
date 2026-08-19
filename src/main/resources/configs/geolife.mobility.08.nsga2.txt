@@ -1,6 +1,6 @@
 $basePath = ''outputs/{^^.name}/{^^.startTime}/''
-$minTreeH = 4
-$maxTreeH = 12
+$minTreeH = 7
+$maxTreeH = 20
 $imgType = svg
 $nPop = 100
 
