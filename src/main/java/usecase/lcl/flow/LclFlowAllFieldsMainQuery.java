@@ -346,7 +346,7 @@ public final class LclFlowAllFieldsMainQuery {
                     45,
                     10,
                     10_000,
-                    10_000L,
+                    120_000L,
                     null,
                     null);
         }

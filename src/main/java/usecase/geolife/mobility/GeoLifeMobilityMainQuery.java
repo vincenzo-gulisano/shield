@@ -289,7 +289,7 @@ public final class GeoLifeMobilityMainQuery {
                     3d,
                     10,
                     10_000,
-                    20_000L,
+                    120_000L,
                     null,
                     null);
         }
