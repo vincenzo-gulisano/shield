@@ -4,6 +4,7 @@ import argparse
 import csv
 import math
 import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -92,7 +93,18 @@ def solution_rank_key(solution: Solution) -> tuple[float, float, float, float, f
     )
 
 
+def raise_csv_field_size_limit() -> None:
+    limit = sys.maxsize
+    while True:
+        try:
+            csv.field_size_limit(limit)
+            return
+        except OverflowError:
+            limit //= 10
+
+
 def read_unique_solutions(input_csv: Path) -> list[Solution]:
+    raise_csv_field_size_limit()
     unique_by_individual: dict[str, Solution] = {}
     with input_csv.open(newline="") as f:
         reader = csv.DictReader(f, delimiter=";")
