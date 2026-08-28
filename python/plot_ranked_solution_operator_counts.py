@@ -4,6 +4,7 @@ import argparse
 import csv
 import os
 import re
+import sys
 import tempfile
 from collections import Counter
 from dataclasses import dataclass
@@ -73,6 +74,16 @@ def sniff_dialect(csv_path: Path) -> csv.Dialect:
         return csv.get_dialect("excel")
 
 
+def raise_csv_field_size_limit() -> None:
+    limit = sys.maxsize
+    while True:
+        try:
+            csv.field_size_limit(limit)
+            return
+        except OverflowError:
+            limit //= 10
+
+
 def required_float(row: dict[str, str], column: str, csv_path: Path) -> float:
     value = row.get(column, "").strip()
     try:
@@ -90,6 +101,7 @@ def required_int(row: dict[str, str], column: str, csv_path: Path) -> int:
 
 
 def read_individuals(csv_path: Path) -> list[Individual]:
+    raise_csv_field_size_limit()
     dialect = sniff_dialect(csv_path)
     individuals = []
     with csv_path.open(newline="") as file:
