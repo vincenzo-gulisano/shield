@@ -33,10 +33,29 @@ public class LiebreAnonymizationQueryFromGraph {
             throws IOException {
 
         final List<Tuple> collectedEvents = Collections.synchronizedList(new ArrayList<>());
+        processAnonymizationQuery(
+                g,
+                CollectionSourceFactory.fromList(inputTuples, 0L),
+                new SinkFunction<Tuple>() {
+                    @Override
+                    public void accept(Tuple t) {
+                        if (t != null) {
+                            collectedEvents.add(t);
+                        }
+                    }
+                },
+                0L);
+        return collectedEvents;
+    }
+
+    public void processAnonymizationQuery(
+            Graph<OperatorRepresentation, ArcType> g,
+            SourceFunction<Tuple> sourceFunction,
+            SinkFunction<Tuple> sinkFunction,
+            long waitTimeoutMillis)
+            throws IOException {
 
         Query query = new Query();
-
-        SourceFunction<Tuple> collectionSource = CollectionSourceFactory.fromList(inputTuples, 0L);
 
         Source<Tuple> source = null;
         Sink<Tuple> sink = null;
@@ -119,24 +138,23 @@ public class LiebreAnonymizationQueryFromGraph {
                 case
 
                         mappers.QueryMapper.Source s -> {
-                    source = query.addBaseSource(s.getID(), collectionSource);
+                    source = query.addBaseSource(s.getID(), sourceFunction);
                 }
                 case
                         mappers.QueryMapper.Sink s -> {
-                    sink = query.addBaseSink(s.getID(), new SinkFunction<Tuple>() {
-                        @Override
-                        public void accept(Tuple t) {
-                            if (t != null) {
-                                collectedEvents.add(t);
-                            }
-                        }
-                    });
+                    sink = query.addBaseSink(s.getID(), sinkFunction);
                 }
                 default -> {
                     throw new IllegalArgumentException(
                             "Unknown operator type in graph: " + opRep.getClass().getSimpleName());
                 }
             }
+        }
+        if (source == null) {
+            throw new IllegalArgumentException("Graph does not contain a source");
+        }
+        if (sink == null) {
+            throw new IllegalArgumentException("Graph does not contain a sink");
         }
 
         // Now that operators are in place, we place connections. Single in - Single out
@@ -179,17 +197,22 @@ public class LiebreAnonymizationQueryFromGraph {
         // }
         query.activate();
 
-        while (sink.isEnabled()) {
-            try {
+        long waitStartMillis = System.currentTimeMillis();
+        try {
+            while (sink.isEnabled()) {
+                if (waitTimeoutMillis > 0L
+                        && System.currentTimeMillis() - waitStartMillis > waitTimeoutMillis) {
+                    throw new IOException("Timed out waiting for anonymization query sink to finish after "
+                            + waitTimeoutMillis + " ms");
+                }
                 Thread.sleep(1);
-
-            } catch (InterruptedException e) {
-                e.printStackTrace();
             }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while waiting for anonymization query sink to finish", e);
+        } finally {
+            query.deActivate();
         }
-
-        query.deActivate();
-        return collectedEvents;
     }
 
     private void connectArc(
