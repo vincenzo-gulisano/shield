@@ -157,23 +157,47 @@ def scatter_panel(ax, datasets: list[Dataset], ranking_mode: str, y_metric: str,
     for index, dataset in enumerate(datasets):
         color, marker = SERIES_STYLES[index]
         selected = selected_for_panel(dataset, ranking_mode)
-        xs = [item.rescored_privacy for item in selected]
-        ys = [getattr(item, f"rescored_{y_metric}") for item in selected]
+        original_xs = [item.privacy for item in selected]
+        original_ys = [getattr(item, y_metric) for item in selected]
+        rescored_xs = [item.rescored_privacy for item in selected]
+        rescored_ys = [getattr(item, f"rescored_{y_metric}") for item in selected]
+        for item in selected:
+            ax.plot(
+                [item.privacy, item.rescored_privacy],
+                [getattr(item, y_metric), getattr(item, f"rescored_{y_metric}")],
+                color=color,
+                linewidth=0.6,
+                alpha=0.22,
+                zorder=1,
+            )
         ax.scatter(
-            xs,
-            ys,
-            label=dataset.label,
+            original_xs,
+            original_ys,
+            label=f"{dataset.label} original",
+            marker=marker,
+            facecolors="none",
+            edgecolors=color,
+            s=44,
+            alpha=0.78,
+            linewidths=0.9,
+            zorder=2,
+        )
+        ax.scatter(
+            rescored_xs,
+            rescored_ys,
+            label=f"{dataset.label} rescored",
             marker=marker,
             color=color,
             s=42,
             alpha=0.78,
             edgecolors="white",
             linewidths=0.35,
+            zorder=3,
         )
 
     ax.set_title(title)
-    ax.set_xlabel("rescored privacy")
-    ax.set_ylabel(f"rescored {y_metric}")
+    ax.set_xlabel("privacy")
+    ax.set_ylabel(y_metric)
     ax.set_xlim(-0.02, 1.02)
     ax.set_ylim(-0.02, 1.02)
     ax.grid(True, linewidth=0.4, alpha=0.35)
@@ -192,6 +216,7 @@ def write_plot_points_csv(datasets: list[Dataset], output_path: Path) -> Path:
             "source_csv",
             "ranking_mode",
             "panel",
+            "score_set",
             "selection_rank",
             "seed",
             "source_group",
@@ -215,40 +240,51 @@ def write_plot_points_csv(datasets: list[Dataset], output_path: Path) -> Path:
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
         panels = [
-            ("top_min", "top_min_rescored_privacy_fidelity", "fidelity"),
-            ("top_min", "top_min_rescored_privacy_semantics", "semantics"),
-            ("top_distance", "top_distance_rescored_privacy_fidelity", "fidelity"),
-            ("top_distance", "top_distance_rescored_privacy_semantics", "semantics"),
+            ("top_min", "top_min_privacy_fidelity", "fidelity"),
+            ("top_min", "top_min_privacy_semantics", "semantics"),
+            ("top_distance", "top_distance_privacy_fidelity", "fidelity"),
+            ("top_distance", "top_distance_privacy_semantics", "semantics"),
         ]
         for dataset in datasets:
             for ranking_mode, panel, y_metric in panels:
                 for item in selected_for_panel(dataset, ranking_mode):
-                    y_value = getattr(item, f"rescored_{y_metric}")
+                    common = {
+                        "id": dataset.label,
+                        "source_csv": item.source_csv,
+                        "ranking_mode": ranking_mode,
+                        "panel": panel,
+                        "selection_rank": item.selection_rank,
+                        "seed": item.seed,
+                        "source_group": item.source_group,
+                        "source_row": item.source_row,
+                        "original_rank": item.original_rank,
+                        "privacy": f"{item.privacy:.12g}",
+                        "semantics": f"{item.semantics:.12g}",
+                        "fidelity": f"{item.fidelity:.12g}",
+                        "min_privacy_semantics_fidelity": f"{item.min_metric:.12g}",
+                        "distance_from_perfect": f"{item.distance:.12g}",
+                        "rescored_privacy": f"{item.rescored_privacy:.12g}",
+                        "rescored_semantics": f"{item.rescored_semantics:.12g}",
+                        "rescored_fidelity": f"{item.rescored_fidelity:.12g}",
+                        "rescored_min_privacy_semantics_fidelity": f"{item.rescored_min_metric:.12g}",
+                        "rescored_distance_from_perfect": f"{item.rescored_distance:.12g}",
+                    }
                     writer.writerow(
-                        {
-                            "id": dataset.label,
-                            "source_csv": item.source_csv,
-                            "ranking_mode": ranking_mode,
-                            "panel": panel,
-                            "selection_rank": item.selection_rank,
-                            "seed": item.seed,
-                            "source_group": item.source_group,
-                            "source_row": item.source_row,
-                            "original_rank": item.original_rank,
-                            "privacy": f"{item.privacy:.12g}",
-                            "semantics": f"{item.semantics:.12g}",
-                            "fidelity": f"{item.fidelity:.12g}",
-                            "min_privacy_semantics_fidelity": f"{item.min_metric:.12g}",
-                            "distance_from_perfect": f"{item.distance:.12g}",
-                            "rescored_privacy": f"{item.rescored_privacy:.12g}",
-                            "rescored_semantics": f"{item.rescored_semantics:.12g}",
-                            "rescored_fidelity": f"{item.rescored_fidelity:.12g}",
-                            "rescored_min_privacy_semantics_fidelity": f"{item.rescored_min_metric:.12g}",
-                            "rescored_distance_from_perfect": f"{item.rescored_distance:.12g}",
+                        common | {
+                            "score_set": "original",
+                            "x_metric": "privacy",
+                            "y_metric": y_metric,
+                            "x": f"{item.privacy:.12g}",
+                            "y": f"{getattr(item, y_metric):.12g}",
+                        }
+                    )
+                    writer.writerow(
+                        common | {
+                            "score_set": "rescored",
                             "x_metric": "rescored_privacy",
                             "y_metric": f"rescored_{y_metric}",
                             "x": f"{item.rescored_privacy:.12g}",
-                            "y": f"{y_value:.12g}",
+                            "y": f"{getattr(item, f'rescored_{y_metric}'):.12g}",
                         }
                     )
     return csv_path
@@ -269,28 +305,28 @@ def plot_scores(datasets: list[Dataset], output_path: Path, write_csv: bool) -> 
         datasets,
         "top_min",
         "fidelity",
-        "Selected by original min metric: rescored privacy vs fidelity",
+        "Selected by original min metric: privacy vs fidelity",
     )
     scatter_panel(
         axes[0, 1],
         datasets,
         "top_min",
         "semantics",
-        "Selected by original min metric: rescored privacy vs semantics",
+        "Selected by original min metric: privacy vs semantics",
     )
     scatter_panel(
         axes[1, 0],
         datasets,
         "top_distance",
         "fidelity",
-        "Selected by original distance: rescored privacy vs fidelity",
+        "Selected by original distance: privacy vs fidelity",
     )
     scatter_panel(
         axes[1, 1],
         datasets,
         "top_distance",
         "semantics",
-        "Selected by original distance: rescored privacy vs semantics",
+        "Selected by original distance: privacy vs semantics",
     )
 
     handles, labels = axes[0, 0].get_legend_handles_labels()
@@ -313,7 +349,7 @@ def plot_scores(datasets: list[Dataset], output_path: Path, write_csv: bool) -> 
             f"{dataset.label}: plotted "
             f"{len(selected_for_panel(dataset, 'top_min'))} top_min and "
             f"{len(selected_for_panel(dataset, 'top_distance'))} top_distance rows "
-            f"from {dataset.csv_path}"
+            f"from {dataset.csv_path} as original and rescored points"
         )
     print(f"Wrote plot to {output_path}")
     if written_csv_path is not None:
@@ -322,7 +358,10 @@ def plot_scores(datasets: list[Dataset], output_path: Path, write_csv: bool) -> 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Plot rescored ranked solutions produced by usecase.analysis.RescoreIndividuals."
+        description=(
+            "Plot original and rescored ranked solutions produced by "
+            "usecase.analysis.RescoreIndividuals."
+        )
     )
     parser.add_argument(
         "--csvs",
@@ -349,7 +388,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--write-csv",
         action="store_true",
-        help="Also write the plotted rescored data points next to the output using a .csv extension.",
+        help="Also write the plotted original and rescored data points next to the output using a .csv extension.",
     )
     return parser.parse_args()
 
