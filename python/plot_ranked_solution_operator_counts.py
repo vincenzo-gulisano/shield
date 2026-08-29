@@ -4,11 +4,16 @@ import argparse
 import csv
 import os
 import re
-import sys
 import tempfile
 from collections import Counter
-from dataclasses import dataclass
 from pathlib import Path
+
+from ranked_solution_io import (
+    DatasetScores as Dataset,
+    IndividualScores as Individual,
+    read_individuals,
+    top_by_min_metric,
+)
 
 
 PLOT_CACHE_DIR = Path(tempfile.gettempdir()) / "shield-python-plot-cache"
@@ -17,22 +22,46 @@ os.environ.setdefault("XDG_CACHE_HOME", str(PLOT_CACHE_DIR))
 os.environ.setdefault("MPLCONFIGDIR", str(PLOT_CACHE_DIR / "matplotlib"))
 
 
-REQUIRED_COLUMNS = {
-    "rank",
-    "seed",
-    "min_privacy_semantics_fidelity",
-    "distance_from_perfect",
-    "privacy",
-    "semantics",
-    "fidelity",
-    "source_group",
-    "source_row",
-    "image",
-    "individual",
-}
-
 STRUCTURAL_NODES = {"Source", "Sink", "Union"}
 OPERATOR_RE = re.compile(r"\b([A-Za-z][A-Za-z0-9]*)\[id=")
+OPERATOR_GROUPS = [
+    (
+        "shield1",
+        [
+            "FilterOperator",
+            "MapDuplicate",
+            "MapNoise",
+            "MapAggregate",
+        ],
+    ),
+    (
+        "dag",
+        [
+            "ConditionalFork",
+            "Fork",
+            "MapRIR",
+            "MapTimestampPairwiseSwap",
+            "MapTimestampGroupShuffle",
+        ],
+    ),
+    (
+        "provenance",
+        [
+            "FilterQueryCondition",
+            "QueryConditionFork",
+            "MapConditionPreservingNoise",
+            "MapConditionPreservingRIR",
+            "MapConditionPairwiseSwap",
+            "MapConditionPartitionShuffle",
+        ],
+    ),
+]
+OPERATOR_ORDER = [operator for _, operators in OPERATOR_GROUPS for operator in operators]
+OPERATOR_GROUP_BY_NAME = {
+    operator: group
+    for group, operators in OPERATOR_GROUPS
+    for operator in operators
+}
 
 SERIES_COLORS = [
     "#1f77b4",
@@ -46,117 +75,24 @@ SERIES_COLORS = [
 ]
 
 
-@dataclass(frozen=True)
-class Individual:
-    rank: int
-    seed: str
-    min_metric: float
-    distance: float
-    privacy: float
-    semantics: float
-    fidelity: float
-    individual: str
-
-
-@dataclass(frozen=True)
-class Dataset:
-    label: str
-    csv_path: Path
-    individuals: list[Individual]
-
-
-def sniff_dialect(csv_path: Path) -> csv.Dialect:
-    with csv_path.open(newline="") as file:
-        sample = file.read(8192)
-    try:
-        return csv.Sniffer().sniff(sample, delimiters=",;\t")
-    except csv.Error:
-        return csv.get_dialect("excel")
-
-
-def raise_csv_field_size_limit() -> None:
-    limit = sys.maxsize
-    while True:
-        try:
-            csv.field_size_limit(limit)
-            return
-        except OverflowError:
-            limit //= 10
-
-
-def required_float(row: dict[str, str], column: str, csv_path: Path) -> float:
-    value = row.get(column, "").strip()
-    try:
-        return float(value)
-    except ValueError as error:
-        raise ValueError(f"Invalid numeric value for column '{column}' in {csv_path}: {value!r}") from error
-
-
-def required_int(row: dict[str, str], column: str, csv_path: Path) -> int:
-    value = row.get(column, "").strip()
-    try:
-        return int(value)
-    except ValueError as error:
-        raise ValueError(f"Invalid integer value for column '{column}' in {csv_path}: {value!r}") from error
-
-
-def read_individuals(csv_path: Path) -> list[Individual]:
-    raise_csv_field_size_limit()
-    dialect = sniff_dialect(csv_path)
-    individuals = []
-    with csv_path.open(newline="") as file:
-        reader = csv.DictReader(file, dialect=dialect)
-        fieldnames = {name.strip() for name in reader.fieldnames or []}
-        missing_columns = sorted(REQUIRED_COLUMNS - fieldnames)
-        if missing_columns:
-            raise ValueError(f"{csv_path} is missing required columns: {', '.join(missing_columns)}")
-
-        for raw_row in reader:
-            row = {
-                key.strip(): (value or "").strip()
-                for key, value in raw_row.items()
-                if key is not None
-            }
-            individuals.append(
-                Individual(
-                    rank=required_int(row, "rank", csv_path),
-                    seed=row["seed"],
-                    min_metric=required_float(row, "min_privacy_semantics_fidelity", csv_path),
-                    distance=required_float(row, "distance_from_perfect", csv_path),
-                    privacy=required_float(row, "privacy", csv_path),
-                    semantics=required_float(row, "semantics", csv_path),
-                    fidelity=required_float(row, "fidelity", csv_path),
-                    individual=row["individual"],
-                )
-            )
-    return individuals
-
-
-def top_by_min_metric(individuals: list[Individual], limit: int) -> list[Individual]:
-    return sorted(
-        individuals,
-        key=lambda item: (
-            -item.min_metric,
-            item.distance,
-            -item.privacy,
-            -item.semantics,
-            -item.fidelity,
-            item.rank,
-        ),
-    )[:limit]
-
-
 def nodes_section(individual: str) -> str:
     match = re.search(r"nodes=\[(.*?)]\s*, arcs=", individual)
     return match.group(1) if match else individual
 
 
 def operator_types(individual: Individual) -> list[str]:
-    return [
+    operators = [
         operator
         for operator in OPERATOR_RE.findall(nodes_section(individual.individual))
         if operator not in STRUCTURAL_NODES
     ]
+    unexpected = sorted(set(operators) - set(OPERATOR_ORDER))
+    if unexpected:
+        raise ValueError(
+            f"Unexpected operator type(s) in rank {individual.rank}, seed "
+            f"{individual.seed}: {', '.join(unexpected)}"
+        )
+    return operators
 
 
 def operator_counts(dataset: Dataset, limit: int) -> Counter[str]:
@@ -170,13 +106,55 @@ def operator_order(counts_by_label: dict[str, Counter[str]]) -> list[str]:
     totals = Counter()
     for counts in counts_by_label.values():
         totals.update(counts)
-    return [
-        operator
-        for operator, _ in sorted(totals.items(), key=lambda item: (-item[1], item[0]))
-    ]
+    unexpected = sorted(set(totals) - set(OPERATOR_ORDER))
+    if unexpected:
+        raise ValueError(f"Unexpected operator type(s): {', '.join(unexpected)}")
+    return [operator for operator in OPERATOR_ORDER if operator in totals]
 
 
-def plot_counts(datasets: list[Dataset], limit: int, output_path: Path) -> None:
+def plot_counts_csv_path(output_path: Path) -> Path:
+    return output_path.with_suffix(".csv")
+
+
+def write_counts_csv(
+    datasets: list[Dataset],
+    limit: int,
+    counts_by_label: dict[str, Counter[str]],
+    operators: list[str],
+    output_path: Path,
+) -> Path:
+    csv_path = plot_counts_csv_path(output_path)
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    with csv_path.open("w", newline="") as file:
+        fieldnames = [
+            "id",
+            "source_csv",
+            "operator",
+            "operator_group",
+            "count",
+            "selected_individuals",
+            "limit",
+        ]
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+        for dataset in datasets:
+            selected_count = min(limit, len(dataset.individuals))
+            for operator in operators:
+                writer.writerow(
+                    {
+                        "id": dataset.label,
+                        "source_csv": dataset.csv_path,
+                        "operator": operator,
+                        "operator_group": OPERATOR_GROUP_BY_NAME[operator],
+                        "count": counts_by_label[dataset.label].get(operator, 0),
+                        "selected_individuals": selected_count,
+                        "limit": limit,
+                    }
+                )
+    return csv_path
+
+
+def plot_counts(datasets: list[Dataset], limit: int, output_path: Path, write_csv: bool) -> None:
     import matplotlib
 
     matplotlib.use("Agg")
@@ -224,6 +202,7 @@ def plot_counts(datasets: list[Dataset], limit: int, output_path: Path) -> None:
     figure.savefig(output_path, dpi=200)
     plt.close(figure)
 
+    written_csv_path = write_counts_csv(datasets, limit, counts_by_label, operators, output_path) if write_csv else None
     for dataset in datasets:
         selected = top_by_min_metric(dataset.individuals, limit)
         counts_text = ", ".join(
@@ -234,6 +213,8 @@ def plot_counts(datasets: list[Dataset], limit: int, output_path: Path) -> None:
         print(f"{dataset.label}: counted {len(selected)} individuals from {dataset.csv_path}")
         print(f"  {counts_text}")
     print(f"Wrote plot to {output_path}")
+    if written_csv_path is not None:
+        print(f"Wrote plot data to {written_csv_path}")
 
 
 def parse_args() -> argparse.Namespace:
@@ -270,6 +251,11 @@ def parse_args() -> argparse.Namespace:
         required=True,
         help="Output image path, for example outputs/operator_counts.png or .svg.",
     )
+    parser.add_argument(
+        "--write-csv",
+        action="store_true",
+        help="Also write the plotted operator counts next to the output using a .csv extension.",
+    )
     return parser.parse_args()
 
 
@@ -286,7 +272,7 @@ def main() -> None:
         Dataset(label=label, csv_path=csv_path, individuals=read_individuals(csv_path))
         for csv_path, label in zip(args.csvs, args.ids)
     ]
-    plot_counts(datasets, args.individuals, args.output)
+    plot_counts(datasets, args.individuals, args.output, args.write_csv)
 
 
 if __name__ == "__main__":

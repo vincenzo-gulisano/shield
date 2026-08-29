@@ -3,10 +3,16 @@
 import argparse
 import csv
 import os
-import sys
 import tempfile
-from dataclasses import dataclass
 from pathlib import Path
+
+from ranked_solution_io import (
+    DatasetScores,
+    IndividualScores,
+    read_individuals,
+    select_by_distance,
+    select_by_min_metric,
+)
 
 
 PLOT_CACHE_DIR = Path(tempfile.gettempdir()) / "shield-python-plot-cache"
@@ -14,20 +20,6 @@ PLOT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 os.environ.setdefault("XDG_CACHE_HOME", str(PLOT_CACHE_DIR))
 os.environ.setdefault("MPLCONFIGDIR", str(PLOT_CACHE_DIR / "matplotlib"))
 
-
-REQUIRED_COLUMNS = {
-    "rank",
-    "seed",
-    "min_privacy_semantics_fidelity",
-    "distance_from_perfect",
-    "privacy",
-    "semantics",
-    "fidelity",
-    "source_group",
-    "source_row",
-    "image",
-    "individual",
-}
 
 SERIES_STYLES = [
     ("#1f77b4", "o"),
@@ -39,118 +31,6 @@ SERIES_STYLES = [
     ("#e377c2", "v"),
     ("#17becf", "*"),
 ]
-
-
-@dataclass(frozen=True)
-class IndividualScores:
-    rank: int
-    seed: str
-    min_metric: float
-    distance: float
-    privacy: float
-    semantics: float
-    fidelity: float
-
-
-@dataclass(frozen=True)
-class DatasetScores:
-    label: str
-    csv_path: Path
-    individuals: list[IndividualScores]
-
-
-def sniff_dialect(csv_path: Path) -> csv.Dialect:
-    with csv_path.open(newline="") as file:
-        sample = file.read(8192)
-    try:
-        return csv.Sniffer().sniff(sample, delimiters=",;\t")
-    except csv.Error:
-        return csv.get_dialect("excel")
-
-
-def raise_csv_field_size_limit() -> None:
-    limit = sys.maxsize
-    while True:
-        try:
-            csv.field_size_limit(limit)
-            return
-        except OverflowError:
-            limit //= 10
-
-
-def required_float(row: dict[str, str], column: str, csv_path: Path) -> float:
-    value = row.get(column, "").strip()
-    try:
-        return float(value)
-    except ValueError as error:
-        raise ValueError(f"Invalid numeric value for column '{column}' in {csv_path}: {value!r}") from error
-
-
-def required_int(row: dict[str, str], column: str, csv_path: Path) -> int:
-    value = row.get(column, "").strip()
-    try:
-        return int(value)
-    except ValueError as error:
-        raise ValueError(f"Invalid integer value for column '{column}' in {csv_path}: {value!r}") from error
-
-
-def read_individuals(csv_path: Path) -> list[IndividualScores]:
-    raise_csv_field_size_limit()
-    dialect = sniff_dialect(csv_path)
-    individuals = []
-    with csv_path.open(newline="") as file:
-        reader = csv.DictReader(file, dialect=dialect)
-        fieldnames = {name.strip() for name in reader.fieldnames or []}
-        missing_columns = sorted(REQUIRED_COLUMNS - fieldnames)
-        if missing_columns:
-            raise ValueError(f"{csv_path} is missing required columns: {', '.join(missing_columns)}")
-
-        for raw_row in reader:
-            row = {
-                key.strip(): (value or "").strip()
-                for key, value in raw_row.items()
-                if key is not None
-            }
-            individuals.append(
-                IndividualScores(
-                    rank=required_int(row, "rank", csv_path),
-                    seed=row["seed"],
-                    min_metric=required_float(row, "min_privacy_semantics_fidelity", csv_path),
-                    distance=required_float(row, "distance_from_perfect", csv_path),
-                    privacy=required_float(row, "privacy", csv_path),
-                    semantics=required_float(row, "semantics", csv_path),
-                    fidelity=required_float(row, "fidelity", csv_path),
-                )
-            )
-    return individuals
-
-
-def top_by_min_metric(individuals: list[IndividualScores], limit: int) -> list[IndividualScores]:
-    return sorted(
-        individuals,
-        key=lambda item: (
-            -item.min_metric,
-            item.distance,
-            -item.privacy,
-            -item.semantics,
-            -item.fidelity,
-            item.rank,
-        ),
-    )[:limit]
-
-
-def top_by_distance(individuals: list[IndividualScores], limit: int) -> list[IndividualScores]:
-    return sorted(
-        individuals,
-        key=lambda item: (
-            item.distance,
-            -item.min_metric,
-            -item.privacy,
-            -item.semantics,
-            -item.fidelity,
-            item.rank,
-        ),
-    )[:limit]
 
 
 def scatter_panel(ax, datasets, selected_by_label, y_metric, title):
@@ -179,49 +59,126 @@ def scatter_panel(ax, datasets, selected_by_label, y_metric, title):
     ax.grid(True, linewidth=0.4, alpha=0.35)
 
 
-def plot_scores(datasets: list[DatasetScores], limit: int, output_path: Path) -> None:
+def plot_points_csv_path(output_path: Path) -> Path:
+    return output_path.with_suffix(".csv")
+
+
+def write_plot_points_csv(
+    datasets: list[DatasetScores],
+    top_min: dict[str, list[IndividualScores]],
+    top_distance: dict[str, list[IndividualScores]],
+    output_path: Path,
+) -> Path:
+    csv_path = plot_points_csv_path(output_path)
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    with csv_path.open("w", newline="") as file:
+        fieldnames = [
+            "id",
+            "source_csv",
+            "ranking_mode",
+            "panel",
+            "plot_rank",
+            "seed",
+            "source_group",
+            "source_row",
+            "original_rank",
+            "privacy",
+            "semantics",
+            "fidelity",
+            "min_privacy_semantics_fidelity",
+            "distance_from_perfect",
+            "x_metric",
+            "y_metric",
+            "x",
+            "y",
+        ]
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+        panels = [
+            ("top_min", "top_min_privacy_fidelity", top_min, "fidelity"),
+            ("top_min", "top_min_privacy_semantics", top_min, "semantics"),
+            ("top_distance", "top_distance_privacy_fidelity", top_distance, "fidelity"),
+            ("top_distance", "top_distance_privacy_semantics", top_distance, "semantics"),
+        ]
+        for dataset in datasets:
+            for ranking_mode, panel, selected_by_label, y_metric in panels:
+                for plot_rank, item in enumerate(selected_by_label[dataset.label], start=1):
+                    y_value = getattr(item, y_metric)
+                    writer.writerow(
+                        {
+                            "id": dataset.label,
+                            "source_csv": dataset.csv_path,
+                            "ranking_mode": ranking_mode,
+                            "panel": panel,
+                            "plot_rank": plot_rank,
+                            "seed": item.seed,
+                            "source_group": item.source_group,
+                            "source_row": item.source_row,
+                            "original_rank": item.rank,
+                            "privacy": f"{item.privacy:.12g}",
+                            "semantics": f"{item.semantics:.12g}",
+                            "fidelity": f"{item.fidelity:.12g}",
+                            "min_privacy_semantics_fidelity": f"{item.min_metric:.12g}",
+                            "distance_from_perfect": f"{item.distance:.12g}",
+                            "x_metric": "privacy",
+                            "y_metric": y_metric,
+                            "x": f"{item.privacy:.12g}",
+                            "y": f"{y_value:.12g}",
+                        }
+                    )
+    return csv_path
+
+
+def plot_scores(
+    datasets: list[DatasetScores],
+    limit: int,
+    output_path: Path,
+    write_csv: bool,
+    top_one_per_seed_enabled: bool,
+) -> None:
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
     top_min = {
-        dataset.label: top_by_min_metric(dataset.individuals, limit)
+        dataset.label: select_by_min_metric(dataset, limit, top_one_per_seed_enabled)
         for dataset in datasets
     }
     top_distance = {
-        dataset.label: top_by_distance(dataset.individuals, limit)
+        dataset.label: select_by_distance(dataset, limit, top_one_per_seed_enabled)
         for dataset in datasets
     }
 
+    selection_label = f"Top {limit} seed representatives" if top_one_per_seed_enabled else f"Top {limit}"
     figure, axes = plt.subplots(2, 2, figsize=(12, 9), sharex=True, sharey=True)
     scatter_panel(
         axes[0, 0],
         datasets,
         top_min,
         "fidelity",
-        f"Top {limit} by min metric: privacy vs fidelity",
+        f"{selection_label} by min metric: privacy vs fidelity",
     )
     scatter_panel(
         axes[0, 1],
         datasets,
         top_min,
         "semantics",
-        f"Top {limit} by min metric: privacy vs semantics",
+        f"{selection_label} by min metric: privacy vs semantics",
     )
     scatter_panel(
         axes[1, 0],
         datasets,
         top_distance,
         "fidelity",
-        f"Top {limit} by distance: privacy vs fidelity",
+        f"{selection_label} by distance: privacy vs fidelity",
     )
     scatter_panel(
         axes[1, 1],
         datasets,
         top_distance,
         "semantics",
-        f"Top {limit} by distance: privacy vs semantics",
+        f"{selection_label} by distance: privacy vs semantics",
     )
 
     handles, labels = axes[0, 0].get_legend_handles_labels()
@@ -238,12 +195,15 @@ def plot_scores(datasets: list[DatasetScores], limit: int, output_path: Path) ->
     figure.savefig(output_path, dpi=200)
     plt.close(figure)
 
+    written_csv_path = write_plot_points_csv(datasets, top_min, top_distance, output_path) if write_csv else None
     for dataset in datasets:
         print(
             f"{dataset.label}: plotted {len(top_min[dataset.label])} by min metric "
             f"and {len(top_distance[dataset.label])} by distance from {dataset.csv_path}"
         )
     print(f"Wrote plot to {output_path}")
+    if written_csv_path is not None:
+        print(f"Wrote plot data to {written_csv_path}")
 
 
 def parse_args() -> argparse.Namespace:
@@ -280,6 +240,19 @@ def parse_args() -> argparse.Namespace:
         required=True,
         help="Output image path, for example outputs/comparison.png or .svg.",
     )
+    parser.add_argument(
+        "--write-csv",
+        action="store_true",
+        help="Also write the plotted data points next to the output using a .csv extension.",
+    )
+    parser.add_argument(
+        "--top-one-per-seed",
+        action="store_true",
+        help=(
+            "Select the best individual from each seed first, then plot the top -i "
+            "seed representatives for each ranking."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -296,7 +269,7 @@ def main() -> None:
         DatasetScores(label=label, csv_path=csv_path, individuals=read_individuals(csv_path))
         for csv_path, label in zip(args.csvs, args.ids)
     ]
-    plot_scores(datasets, args.individuals, args.output)
+    plot_scores(datasets, args.individuals, args.output, args.write_csv, args.top_one_per_seed)
 
 
 if __name__ == "__main__":

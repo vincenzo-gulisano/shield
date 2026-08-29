@@ -1,16 +1,39 @@
-java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 32 -f src/main/resources/configs/lcl.flow.01.nsga2.txt
-java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 32 -f src/main/resources/configs/lcl.flow.02.nsga2.txt
+# java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 32 -f src/main/resources/configs/lcl.flow.01.nsga2.txt
+# java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 32 -f src/main/resources/configs/lcl.flow.02.nsga2.txt
+# java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 32 -f src/main/resources/configs/lcl.flow.04.nsga2.txt
+# java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 32 -f src/main/resources/configs/lcl.flow.08.nsga2.txt
+# java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 32 -f src/main/resources/configs/geolife.mobility.01.nsga2.txt
+# java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 32 -f src/main/resources/configs/geolife.mobility.02.nsga2.txt
+# java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 32 -f src/main/resources/configs/geolife.mobility.04.nsga2.txt
+# java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 32 -f src/main/resources/configs/geolife.mobility.08.nsga2.txt
+
+# rename folders to geolife_oldpriv geolife_newpriv geolife_newpriv_dag and geolife_newpriv_dag_prov (and the same for lvl_flow)
+
+base_folder=/Users/vinmas/repositories/Shield/vincenzo/shield2/all2
+
+# python python/extract_unique_percentile_solutions.py $base_folder/geolife_oldpriv/solutions-percentile.csv $base_folder/geolife_oldpriv/individuals
+# python python/extract_unique_percentile_solutions.py $base_folder/geolife_newpriv/solutions-percentile.csv $base_folder/geolife_newpriv/individuals
+# python python/extract_unique_percentile_solutions.py $base_folder/geolife_newpriv_dag/solutions-percentile.csv $base_folder/geolife_newpriv_dag/individuals
+# python python/extract_unique_percentile_solutions.py $base_folder/geolife_newpriv_dag_prov/solutions-percentile.csv $base_folder/geolife_newpriv_dag_prov/individuals
+
+# python python/extract_unique_percentile_solutions.py $base_folder/lcl_flow_oldpriv/solutions-percentile.csv $base_folder/lcl_flow_oldpriv/individuals
+# python python/extract_unique_percentile_solutions.py $base_folder/lcl_flow_newpriv/solutions-percentile.csv $base_folder/lcl_flow_newpriv/individuals
+# python python/extract_unique_percentile_solutions.py $base_folder/lcl_flow_newpriv_dag/solutions-percentile.csv $base_folder/lcl_flow_newpriv_dag/individuals
+# python python/extract_unique_percentile_solutions.py $base_folder/lcl_flow_newpriv_dag_prov/solutions-percentile.csv $base_folder/lcl_flow_newpriv_dag_prov/individuals
+
+python python/plot_ranked_solution_scores.py --write-csv --top-one-per-seed --csvs $base_folder/geolife_oldpriv/individuals/unique_solutions.csv $base_folder/geolife_newpriv/individuals/unique_solutions.csv $base_folder/geolife_newpriv_dag/individuals/unique_solutions.csv $base_folder/geolife_newpriv_dag_prov/individuals/unique_solutions.csv --ids shield1-oldPriv shield1-newPriv shield2 shield2_prov -i 20 -o $base_folder/geolife_all.pdf
+python python/plot_ranked_solution_scores.py --write-csv --top-one-per-seed --csvs $base_folder/lcl_flow_oldpriv/individuals/unique_solutions.csv $base_folder/lcl_flow_newpriv/individuals/unique_solutions.csv $base_folder/lcl_flow_newpriv_dag/individuals/unique_solutions.csv $base_folder/lcl_flow_newpriv_dag_prov/individuals/unique_solutions.csv --ids shield1-oldPriv shield1-newPriv shield2 shield2_prov -i 20 -o $base_folder/lcl_flow_all.pdf
+
+python python/plot_ranked_solution_operator_counts.py --write-csv --csvs $base_folder/geolife_oldpriv/individuals/unique_solutions.csv $base_folder/geolife_newpriv/individuals/unique_solutions.csv $base_folder/geolife_newpriv_dag/individuals/unique_solutions.csv $base_folder/geolife_newpriv_dag_prov/individuals/unique_solutions.csv --ids shield1-oldPriv shield1-newPriv shield2 shield2_prov -i 20 -o $base_folder/geolife_all_ops.pdf
+python python/plot_ranked_solution_operator_counts.py --write-csv --csvs $base_folder/lcl_flow_oldpriv/individuals/unique_solutions.csv $base_folder/lcl_flow_newpriv/individuals/unique_solutions.csv $base_folder/lcl_flow_newpriv_dag/individuals/unique_solutions.csv $base_folder/lcl_flow_newpriv_dag_prov/individuals/unique_solutions.csv --ids shield1-oldPriv shield1-newPriv shield2 shield2_prov -i 20 -o $base_folder/lcl_flow_all_ops.pdf
+
+#########################
+
 # java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 1 -f src/main/resources/configs/lcl.flow.02.true-rank.nsga2.txt
-java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 32 -f src/main/resources/configs/lcl.flow.04.nsga2.txt
 # java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 1 -f src/main/resources/configs/lcl.flow.04.true-rank.nsga2.txt
-java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 32 -f src/main/resources/configs/lcl.flow.08.nsga2.txt
 # java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 1 -f src/main/resources/configs/lcl.flow.08.true-rank.nsga2.txt
-java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 32 -f src/main/resources/configs/geolife.mobility.01.nsga2.txt
-java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 32 -f src/main/resources/configs/geolife.mobility.02.nsga2.txt
 # java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 1 -f src/main/resources/configs/geolife.mobility.02.true-rank.nsga2.txt
-java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 32 -f src/main/resources/configs/geolife.mobility.04.nsga2.txt
 # java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 1 -f src/main/resources/configs/geolife.mobility.04.true-rank.nsga2.txt
-java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 32 -f src/main/resources/configs/geolife.mobility.08.nsga2.txt
 # java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 1 -f src/main/resources/configs/geolife.mobility.08.true-rank.nsga2.txt
 
 # mv geolife.oldpriv geolife_oldpriv 
