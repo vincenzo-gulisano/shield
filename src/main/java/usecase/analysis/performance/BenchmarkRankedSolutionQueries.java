@@ -72,6 +72,7 @@ public final class BenchmarkRankedSolutionQueries {
         Map<String, RateSettings> ratePlan = options.ratePlanPath() == null
                 ? Map.of()
                 : readRatePlan(options.ratePlanPath(), options.warmUpMillis(), options.coolDownMillis());
+        printRuntimeEstimate(rows, options, ratePlan);
         List<Tuple> inputTuples = loadInputTuples(options.useCase(), options.inputCsvPath());
         initializeContributorCondition(options.useCase(), inputTuples);
 
@@ -280,6 +281,59 @@ public final class BenchmarkRankedSolutionQueries {
             return added;
         }
         return existing + "; " + added;
+    }
+
+    private static void printRuntimeEstimate(
+            List<Map<String, String>> manifestRows,
+            Options options,
+            Map<String, RateSettings> ratePlan) {
+        long totalRunMillis = 0L;
+        long minRunMillis = Long.MAX_VALUE;
+        long maxRunMillis = 0L;
+        for (int rowIndex = 0; rowIndex < manifestRows.size(); rowIndex++) {
+            RateSettings rateSettings = rateSettingsFor(
+                    manifestRows.get(rowIndex),
+                    rowIndex + 2,
+                    options.fixedRateSettings(),
+                    ratePlan);
+            long runMillis = rateSettings == null ? options.minRunMillis() : rateSettings.totalRunMillis();
+            totalRunMillis += runMillis * options.repetitions();
+            minRunMillis = Math.min(minRunMillis, runMillis);
+            maxRunMillis = Math.max(maxRunMillis, runMillis);
+        }
+        int totalRuns = manifestRows.size() * options.repetitions();
+        long timeoutBudgetMillis = totalRuns * options.timeoutExtraMillis();
+        System.out.printf(
+                Locale.ROOT,
+                "Benchmark estimate: %d query rows x %d repetitions = %d runs%n",
+                manifestRows.size(),
+                options.repetitions(),
+                totalRuns);
+        System.out.printf(
+                Locale.ROOT,
+                "Benchmark estimate: nominal sequential time %s; with timeout budget %s%n",
+                formatDuration(totalRunMillis),
+                formatDuration(totalRunMillis + timeoutBudgetMillis));
+        System.out.printf(
+                Locale.ROOT,
+                "Benchmark estimate: per-run planned duration %s%s; timeout extra %s per run%n",
+                formatDuration(minRunMillis == Long.MAX_VALUE ? 0L : minRunMillis),
+                minRunMillis == maxRunMillis ? "" : " to " + formatDuration(maxRunMillis),
+                formatDuration(options.timeoutExtraMillis()));
+    }
+
+    private static String formatDuration(long millis) {
+        long totalSeconds = Math.max(0L, Math.round(millis / 1000.0d));
+        long hours = totalSeconds / 3600L;
+        long minutes = (totalSeconds % 3600L) / 60L;
+        long seconds = totalSeconds % 60L;
+        if (hours > 0L) {
+            return String.format(Locale.ROOT, "%dh %02dm %02ds", hours, minutes, seconds);
+        }
+        if (minutes > 0L) {
+            return String.format(Locale.ROOT, "%dm %02ds", minutes, seconds);
+        }
+        return String.format(Locale.ROOT, "%ds", seconds);
     }
 
     private static Map<String, RateSettings> readRatePlan(

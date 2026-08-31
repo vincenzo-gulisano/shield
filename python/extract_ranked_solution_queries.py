@@ -28,7 +28,7 @@ FIELDNAMES = [
     "distance_from_perfect",
     "individual",
 ]
-RANKINGS = ["top_min", "top_distance"]
+RANKINGS = ["top_min"]
 
 
 def row_for(
@@ -107,7 +107,7 @@ def parse_args() -> argparse.Namespace:
         "--individuals",
         type=int,
         required=True,
-        help="Number of best individuals to extract from each CSV in each ranking.",
+        help="Number of best top_min individuals to extract from each CSV.",
     )
     parser.add_argument(
         "-o",
