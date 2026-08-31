@@ -1,5 +1,6 @@
 package usecase.analysis.performance;
 
+import component.source.SourceFunction;
 import io.github.ericmedvet.jgea.core.representation.graph.Graph;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -45,6 +46,12 @@ public final class BenchmarkRankedSolutionQueries {
             "error",
             "per_second_csv",
             "graph_hash",
+            "rate_mode",
+            "rate_start_per_s",
+            "rate_final_per_s",
+            "rate_steps",
+            "rate_step_millis",
+            "rate_bucket_millis",
             "duration_ms",
             "warm_up_millis",
             "cool_down_millis",
@@ -62,6 +69,9 @@ public final class BenchmarkRankedSolutionQueries {
     public static void main(String[] args) throws Exception {
         Options options = Options.parse(args);
         List<Map<String, String>> rows = readCsv(options.manifestPath()).rows();
+        Map<String, RateSettings> ratePlan = options.ratePlanPath() == null
+                ? Map.of()
+                : readRatePlan(options.ratePlanPath(), options.warmUpMillis(), options.coolDownMillis());
         List<Tuple> inputTuples = loadInputTuples(options.useCase(), options.inputCsvPath());
         initializeContributorCondition(options.useCase(), inputTuples);
 
@@ -75,6 +85,7 @@ public final class BenchmarkRankedSolutionQueries {
                 String individual = required(row, "individual", rowIndex + 2);
                 Graph<OperatorRepresentation, ArcType> graph = QueryMapper.parseGraphFromString(individual);
                 String graphHash = shortHash(individual);
+                RateSettings rateSettings = rateSettingsFor(row, rowIndex + 2, options.fixedRateSettings(), ratePlan);
                 for (int repetition = 1; repetition <= options.repetitions(); repetition++) {
                     run++;
                     Path perSecondPath = options.outputDir().resolve(runFileName(run, row, repetition));
@@ -88,6 +99,8 @@ public final class BenchmarkRankedSolutionQueries {
                             options.minRunMillis(),
                             options.warmUpMillis(),
                             options.coolDownMillis(),
+                            options.timeoutExtraMillis(),
+                            rateSettings,
                             perSecondPath);
                     writeCsvRow(indexWriter, values(indexRow, INDEX_HEADER));
                     indexWriter.flush();
@@ -116,16 +129,29 @@ public final class BenchmarkRankedSolutionQueries {
             long minRunMillis,
             long warmUpMillis,
             long coolDownMillis,
+            long timeoutExtraMillis,
+            RateSettings rateSettings,
             Path perSecondPath) {
         SecondStatsRecorder stats = new SecondStatsRecorder(warmUpMillis, coolDownMillis);
-        Map<String, String> row = baseIndexRow(run, manifestRow, repetition, perSecondPath, graphHash);
+        Map<String, String> row = baseIndexRow(run, manifestRow, repetition, perSecondPath, graphHash, rateSettings);
+        long runMillis = rateSettings == null ? minRunMillis : rateSettings.totalRunMillis();
         stats.start();
         try {
+            SourceFunction<Tuple> sourceFunction = rateSettings == null
+                    ? new LoopingTupleSourceFunction(inputTuples, runMillis, stats)
+                    : new SteppedRateLoopingTupleSourceFunction(
+                            inputTuples,
+                            rateSettings.startRatePerSecond(),
+                            rateSettings.finalRatePerSecond(),
+                            rateSettings.steps(),
+                            rateSettings.stepMillis(),
+                            rateSettings.bucketMillis(),
+                            stats);
             new LiebreAnonymizationQueryFromGraph().processAnonymizationQuery(
                     graph,
-                    new LoopingTupleSourceFunction(inputTuples, minRunMillis, stats),
+                    sourceFunction,
                     new LatencyRecordingSinkFunction(stats),
-                    minRunMillis + TIMEOUT_EXTRA_MILLIS);
+                    runMillis + timeoutExtraMillis);
             row.put("status", "ok");
         } catch (Exception e) {
             row.put("status", "error");
@@ -148,7 +174,8 @@ public final class BenchmarkRankedSolutionQueries {
             Map<String, String> manifestRow,
             int repetition,
             Path perSecondPath,
-            String graphHash) {
+            String graphHash,
+            RateSettings rateSettings) {
         Map<String, String> row = new LinkedHashMap<>();
         row.put("run", Integer.toString(run));
         row.put("id", manifestRow.getOrDefault("id", ""));
@@ -163,6 +190,12 @@ public final class BenchmarkRankedSolutionQueries {
         row.put("error", "");
         row.put("per_second_csv", perSecondPath.toString());
         row.put("graph_hash", graphHash);
+        row.put("rate_mode", rateSettings == null ? "unlimited" : "stepped");
+        row.put("rate_start_per_s", rateSettings == null ? "" : formatDouble(rateSettings.startRatePerSecond()));
+        row.put("rate_final_per_s", rateSettings == null ? "" : formatDouble(rateSettings.finalRatePerSecond()));
+        row.put("rate_steps", rateSettings == null ? "" : Integer.toString(rateSettings.steps()));
+        row.put("rate_step_millis", rateSettings == null ? "" : Long.toString(rateSettings.stepMillis()));
+        row.put("rate_bucket_millis", rateSettings == null ? "" : Long.toString(rateSettings.bucketMillis()));
         return row;
     }
 
@@ -247,6 +280,85 @@ public final class BenchmarkRankedSolutionQueries {
             return added;
         }
         return existing + "; " + added;
+    }
+
+    private static Map<String, RateSettings> readRatePlan(
+            Path path,
+            long warmUpMillis,
+            long coolDownMillis) throws IOException {
+        List<Map<String, String>> rows = readCsv(path).rows();
+        Map<String, RateSettings> ratePlan = new LinkedHashMap<>();
+        for (int i = 0; i < rows.size(); i++) {
+            Map<String, String> row = rows.get(i);
+            int sourceRow = i + 2;
+            String id = required(row, "id", sourceRow);
+            RateSettings settings = rateSettingsFromRow(row, sourceRow);
+            validateRunWindow(settings.totalRunMillis(), warmUpMillis, coolDownMillis);
+            ratePlan.put(id, settings);
+        }
+        return ratePlan;
+    }
+
+    private static RateSettings rateSettingsFor(
+            Map<String, String> manifestRow,
+            int sourceRow,
+            RateSettings fixedRateSettings,
+            Map<String, RateSettings> ratePlan) {
+        if (fixedRateSettings != null) {
+            return fixedRateSettings;
+        }
+        if (ratePlan.isEmpty()) {
+            return null;
+        }
+        String id = required(manifestRow, "id", sourceRow);
+        RateSettings rateSettings = ratePlan.get(id);
+        if (rateSettings == null) {
+            throw new IllegalArgumentException("No rate-plan row for id '" + id + "' at manifest row " + sourceRow);
+        }
+        return rateSettings;
+    }
+
+    private static RateSettings parseFixedRateSettings(Map<String, String> values) {
+        boolean anyRateArgument = values.containsKey("rate-start-per-second")
+                || values.containsKey("rate-final-per-second")
+                || values.containsKey("rate-steps")
+                || values.containsKey("rate-step-seconds");
+        if (!anyRateArgument) {
+            return null;
+        }
+        if (!values.containsKey("rate-start-per-second")
+                || !values.containsKey("rate-final-per-second")
+                || !values.containsKey("rate-steps")
+                || !values.containsKey("rate-step-seconds")) {
+            throw new IllegalArgumentException(
+                    "Stepped runs require --rate-start-per-second, --rate-final-per-second, "
+                            + "--rate-steps, and --rate-step-seconds");
+        }
+        return new RateSettings(
+                Double.parseDouble(values.get("rate-start-per-second")),
+                Double.parseDouble(values.get("rate-final-per-second")),
+                Integer.parseInt(values.get("rate-steps")),
+                1000L * Long.parseLong(values.get("rate-step-seconds")),
+                Long.parseLong(values.getOrDefault("rate-bucket-millis", "50")));
+    }
+
+    private static RateSettings rateSettingsFromRow(Map<String, String> row, int sourceRow) {
+        return new RateSettings(
+                Double.parseDouble(required(row, "start_rate_per_s", sourceRow)),
+                Double.parseDouble(required(row, "final_rate_per_s", sourceRow)),
+                Integer.parseInt(required(row, "steps", sourceRow)),
+                1000L * Long.parseLong(required(row, "step_seconds", sourceRow)),
+                Long.parseLong(row.getOrDefault("bucket_millis", "50")));
+    }
+
+    private static void validateRunWindow(long runMillis, long warmUpMillis, long coolDownMillis) {
+        if (runMillis <= warmUpMillis + coolDownMillis) {
+            throw new IllegalArgumentException("Run duration must be longer than warm-up + cool-down");
+        }
+    }
+
+    private static String formatDouble(double value) {
+        return String.format(Locale.ROOT, "%.6f", value);
     }
 
     private static CsvTable readCsv(Path path) throws IOException {
@@ -350,7 +462,10 @@ public final class BenchmarkRankedSolutionQueries {
             int repetitions,
             long minRunMillis,
             long warmUpMillis,
-            long coolDownMillis) {
+            long coolDownMillis,
+            long timeoutExtraMillis,
+            Path ratePlanPath,
+            RateSettings fixedRateSettings) {
 
         private static Options parse(String[] args) {
             Map<String, String> values = parseNamedArgs(args);
@@ -361,9 +476,18 @@ public final class BenchmarkRankedSolutionQueries {
             long minRunMillis = 1000L * Long.parseLong(values.getOrDefault("min-run-seconds", "30"));
             long warmUpMillis = Long.parseLong(values.getOrDefault("warm-up-millis", "0"));
             long coolDownMillis = Long.parseLong(values.getOrDefault("cool-down-millis", "0"));
-            if (minRunMillis <= warmUpMillis + coolDownMillis) {
-                throw new IllegalArgumentException("min-run-seconds must be longer than warm-up-millis + cool-down-millis");
+            long timeoutExtraMillis = 1000L * Long.parseLong(values.getOrDefault(
+                    "timeout-extra-seconds",
+                    Long.toString(TIMEOUT_EXTRA_MILLIS / 1000L)));
+            Path ratePlanPath = values.containsKey("rate-plan") ? Path.of(values.get("rate-plan")) : null;
+            RateSettings fixedRateSettings = parseFixedRateSettings(values);
+            if (ratePlanPath != null && fixedRateSettings != null) {
+                throw new IllegalArgumentException("Use either --rate-plan or explicit stepped-rate arguments, not both");
             }
+            validateRunWindow(
+                    fixedRateSettings == null ? minRunMillis : fixedRateSettings.totalRunMillis(),
+                    warmUpMillis,
+                    coolDownMillis);
             return new Options(
                     useCase,
                     Path.of(required(values, "manifest")),
@@ -372,7 +496,10 @@ public final class BenchmarkRankedSolutionQueries {
                     Integer.parseInt(values.getOrDefault("repetitions", "3")),
                     minRunMillis,
                     warmUpMillis,
-                    coolDownMillis);
+                    coolDownMillis,
+                    timeoutExtraMillis,
+                    ratePlanPath,
+                    fixedRateSettings);
         }
 
         private static Map<String, String> parseNamedArgs(String[] args) {
@@ -422,9 +549,40 @@ public final class BenchmarkRankedSolutionQueries {
                         [--repetitions 3] \\
                         [--min-run-seconds 30] \\
                         [--warm-up-millis 0] \\
-                        [--cool-down-millis 0]
+                        [--cool-down-millis 0] \\
+                        [--timeout-extra-seconds 30] \\
+                        [--rate-plan rate-plan.csv] \\
+                        [--rate-start-per-second 100 --rate-final-per-second 1000 \\
+                         --rate-steps 6 --rate-step-seconds 30 --rate-bucket-millis 50]
                     """);
             System.exit(0);
+        }
+    }
+
+    private record RateSettings(
+            double startRatePerSecond,
+            double finalRatePerSecond,
+            int steps,
+            long stepMillis,
+            long bucketMillis) {
+
+        private RateSettings {
+            if (startRatePerSecond <= 0.0d || finalRatePerSecond <= 0.0d) {
+                throw new IllegalArgumentException("rates must be positive");
+            }
+            if (steps <= 0) {
+                throw new IllegalArgumentException("steps must be positive");
+            }
+            if (stepMillis <= 0L) {
+                throw new IllegalArgumentException("stepMillis must be positive");
+            }
+            if (bucketMillis <= 0L) {
+                throw new IllegalArgumentException("bucketMillis must be positive");
+            }
+        }
+
+        private long totalRunMillis() {
+            return steps * stepMillis;
         }
     }
 
