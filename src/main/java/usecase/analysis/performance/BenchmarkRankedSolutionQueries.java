@@ -484,10 +484,12 @@ public final class BenchmarkRankedSolutionQueries {
             if (ratePlanPath != null && fixedRateSettings != null) {
                 throw new IllegalArgumentException("Use either --rate-plan or explicit stepped-rate arguments, not both");
             }
-            validateRunWindow(
-                    fixedRateSettings == null ? minRunMillis : fixedRateSettings.totalRunMillis(),
-                    warmUpMillis,
-                    coolDownMillis);
+            if (ratePlanPath == null) {
+                validateRunWindow(
+                        fixedRateSettings == null ? minRunMillis : fixedRateSettings.totalRunMillis(),
+                        warmUpMillis,
+                        coolDownMillis);
+            }
             return new Options(
                     useCase,
                     Path.of(required(values, "manifest")),
