@@ -3,7 +3,6 @@
 import argparse
 import csv
 import os
-import re
 import tempfile
 from collections import Counter
 from pathlib import Path
@@ -14,6 +13,7 @@ from ranked_solution_io import (
     read_individuals,
     top_by_min_metric,
 )
+from solution_graph_metrics import operator_types as solution_operator_types
 
 
 PLOT_CACHE_DIR = Path(tempfile.gettempdir()) / "shield-python-plot-cache"
@@ -22,8 +22,6 @@ os.environ.setdefault("XDG_CACHE_HOME", str(PLOT_CACHE_DIR))
 os.environ.setdefault("MPLCONFIGDIR", str(PLOT_CACHE_DIR / "matplotlib"))
 
 
-STRUCTURAL_NODES = {"Source", "Sink", "Union"}
-OPERATOR_RE = re.compile(r"\b([A-Za-z][A-Za-z0-9]*)\[id=")
 OPERATOR_GROUPS = [
     (
         "shield1",
@@ -57,11 +55,6 @@ OPERATOR_GROUPS = [
     ),
 ]
 OPERATOR_ORDER = [operator for _, operators in OPERATOR_GROUPS for operator in operators]
-OPERATOR_GROUP_BY_NAME = {
-    operator: group
-    for group, operators in OPERATOR_GROUPS
-    for operator in operators
-}
 
 SERIES_COLORS = [
     "#1f77b4",
@@ -75,17 +68,8 @@ SERIES_COLORS = [
 ]
 
 
-def nodes_section(individual: str) -> str:
-    match = re.search(r"nodes=\[(.*?)]\s*, arcs=", individual)
-    return match.group(1) if match else individual
-
-
 def operator_types(individual: Individual) -> list[str]:
-    operators = [
-        operator
-        for operator in OPERATOR_RE.findall(nodes_section(individual.individual))
-        if operator not in STRUCTURAL_NODES
-    ]
+    operators = solution_operator_types(individual.individual)
     unexpected = sorted(set(operators) - set(OPERATOR_ORDER))
     if unexpected:
         raise ValueError(
@@ -126,31 +110,17 @@ def write_counts_csv(
     csv_path = plot_counts_csv_path(output_path)
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     with csv_path.open("w", newline="") as file:
-        fieldnames = [
-            "id",
-            "source_csv",
-            "operator",
-            "operator_group",
-            "count",
-            "selected_individuals",
-            "limit",
-        ]
+        fieldnames = ["id"] + operators
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
         for dataset in datasets:
-            selected_count = min(limit, len(dataset.individuals))
-            for operator in operators:
-                writer.writerow(
-                    {
-                        "id": dataset.label,
-                        "source_csv": dataset.csv_path,
-                        "operator": operator,
-                        "operator_group": OPERATOR_GROUP_BY_NAME[operator],
-                        "count": counts_by_label[dataset.label].get(operator, 0),
-                        "selected_individuals": selected_count,
-                        "limit": limit,
-                    }
-                )
+            writer.writerow(
+                {"id": dataset.label}
+                | {
+                    operator: counts_by_label[dataset.label].get(operator, 0)
+                    for operator in operators
+                }
+            )
     return csv_path
 
 

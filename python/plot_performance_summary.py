@@ -25,29 +25,103 @@ EXPERIMENT_LABELS = {
     "04": "04\nDAG\nnew privacy",
     "08": "08\nDAG + prov\nnew privacy",
 }
+QUERY_KEY_FIELDS = ["id", "ranking_mode", "selection_rank", "seed", "graph_hash"]
+AVERAGE_FIELDS = [
+    "target_rate_per_s",
+    "input_throughput_per_s",
+    "output_throughput_per_s",
+    "output_input_ratio",
+    "avg_latency_ms",
+    "max_latency_ms",
+    "max_latency_minus_avg_latency_ms",
+    "latency_slope_ms_per_s",
+]
 
 
-def read_plot_rows(index_csv: Path) -> list[dict[str, str]]:
-    rows = []
-    with index_csv.open(newline="") as file:
+def read_plot_rows(steps_csv: Path, selection: str) -> list[dict[str, str]]:
+    by_repetition = {}
+    with steps_csv.open(newline="") as file:
         for row in csv.DictReader(file):
-            if row["status"] != "ok":
-                continue
-            experiment = ID_TO_EXPERIMENT.get(row["id"], row["id"])
-            rows.append(
-                {
-                    "experiment": experiment,
-                    "id": row["id"],
-                    "run": row["run"],
-                    "ranking_mode": row["ranking_mode"],
-                    "selection_rank": row["selection_rank"],
-                    "seed": row["seed"],
-                    "repetition": row["repetition"],
-                    "input_throughput_per_s": row["input_throughput_per_s"],
-                    "avg_latency_ms": row["avg_latency_ms"],
-                }
-            )
-    return rows
+            key = query_key(row) + (row["run"], row["repetition"])
+            by_repetition.setdefault(key, []).append(row)
+
+    by_query = {}
+    for rows in by_repetition.values():
+        selected = select_step(rows, selection)
+        if selected is None:
+            continue
+        by_query.setdefault(query_key(selected), []).append(selected)
+
+    rows = [average_repetitions(rows, selection) for rows in by_query.values()]
+    return sorted(rows, key=plot_row_key)
+
+
+def query_key(row: dict[str, str]) -> tuple[str, ...]:
+    return tuple(row[field] for field in QUERY_KEY_FIELDS)
+
+
+def select_step(rows: list[dict[str, str]], selection: str) -> dict[str, str] | None:
+    selected = None
+    for row in rows:
+        if selection == "latency-filtered" and (
+                row["crosses_warmup"] == "true" or not acceptable_latency(row)):
+            continue
+        if selected is None or selection_key(row, selection) > selection_key(selected, selection):
+            selected = row
+    return selected
+
+
+def selection_key(row: dict[str, str], selection: str) -> tuple[float, int]:
+    if selection == "max-throughput":
+        return float(row["input_throughput_per_s"]), int(row["step"])
+    return float(row["step"]), int(row["step"])
+
+
+def average_repetitions(rows: list[dict[str, str]], selection: str) -> dict[str, str]:
+    rows = sorted(rows, key=lambda row: (int(row["run"]), int(row["repetition"])))
+    first = rows[0]
+    experiment = ID_TO_EXPERIMENT.get(first["id"], first["id"])
+    averaged = {
+        "experiment": experiment,
+        "selection": selection,
+        "id": first["id"],
+        "ranking_mode": first["ranking_mode"],
+        "selection_rank": first["selection_rank"],
+        "seed": first["seed"],
+        "graph_hash": first["graph_hash"],
+        "repetitions": str(len(rows)),
+        "runs": "|".join(row["run"] for row in rows),
+        "selected_steps": "|".join(row["step"] for row in rows),
+        "selected_step": average(rows, "step"),
+        "crosses_cooldown": str(any(row["crosses_cooldown"] == "true" for row in rows)).lower(),
+    }
+    for field in AVERAGE_FIELDS:
+        averaged[field] = average(rows, field)
+    return averaged
+
+
+def average(rows: list[dict[str, str]], field: str) -> str:
+    values = [float(row[field]) for row in rows if row[field]]
+    if not values:
+        return ""
+    return f"{sum(values) / len(values):.6f}"
+
+
+def plot_row_key(row: dict[str, str]) -> tuple[int, str, int, int, str]:
+    experiment_index = EXPERIMENT_ORDER.index(row["experiment"]) if row["experiment"] in EXPERIMENT_ORDER else 999
+    return (
+        experiment_index,
+        row["id"],
+        int(row["selection_rank"]),
+        int(row["seed"]),
+        row["graph_hash"],
+    )
+
+
+def acceptable_latency(row: dict[str, str]) -> bool:
+    if not row["avg_latency_ms"] or not row["max_latency_ms"]:
+        return False
+    return float(row["max_latency_ms"]) <= 3.0 * float(row["avg_latency_ms"])
 
 
 def write_summary_csv(rows: list[dict[str, str]], output_pdf: Path) -> Path:
@@ -107,17 +181,26 @@ def plot(rows: list[dict[str, str]], output_pdf: Path, title: str | None) -> Non
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Plot average input throughput and latency from a benchmark index.csv."
+        description="Plot throughput and latency from an enriched stepped benchmark CSV."
     )
-    parser.add_argument("index_csv", type=Path)
+    parser.add_argument("steps_csv", type=Path)
     parser.add_argument("-o", "--output", type=Path, required=True)
     parser.add_argument("--title")
+    parser.add_argument(
+        "--selection",
+        choices=["latency-filtered", "rightmost", "max-throughput"],
+        default="latency-filtered",
+        help=(
+            "latency-filtered keeps the current max_latency <= 3 * avg_latency rule; "
+            "rightmost takes the last step; max-throughput takes the step with highest input throughput."
+        ),
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    rows = read_plot_rows(args.index_csv)
+    rows = read_plot_rows(args.steps_csv, args.selection)
     plot(rows, args.output, args.title)
     csv_path = write_summary_csv(rows, args.output)
     print(f"Wrote {args.output}")

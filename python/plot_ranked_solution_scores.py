@@ -10,7 +10,6 @@ from ranked_solution_io import (
     DatasetScores,
     IndividualScores,
     read_individuals,
-    select_by_distance,
     select_by_min_metric,
 )
 
@@ -66,66 +65,29 @@ def plot_points_csv_path(output_path: Path) -> Path:
 def write_plot_points_csv(
     datasets: list[DatasetScores],
     top_min: dict[str, list[IndividualScores]],
-    top_distance: dict[str, list[IndividualScores]],
     output_path: Path,
 ) -> Path:
     csv_path = plot_points_csv_path(output_path)
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     with csv_path.open("w", newline="") as file:
         fieldnames = [
-            "id",
-            "source_csv",
-            "ranking_mode",
-            "panel",
-            "plot_rank",
-            "seed",
-            "source_group",
-            "source_row",
-            "original_rank",
-            "privacy",
-            "semantics",
-            "fidelity",
-            "min_privacy_semantics_fidelity",
-            "distance_from_perfect",
-            "x_metric",
-            "y_metric",
-            "x",
-            "y",
+            f"{dataset.label}_{metric}"
+            for dataset in datasets
+            for metric in ("privacy", "semantics", "fidelity")
         ]
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
-        panels = [
-            ("top_min", "top_min_privacy_fidelity", top_min, "fidelity"),
-            ("top_min", "top_min_privacy_semantics", top_min, "semantics"),
-            ("top_distance", "top_distance_privacy_fidelity", top_distance, "fidelity"),
-            ("top_distance", "top_distance_privacy_semantics", top_distance, "semantics"),
-        ]
-        for dataset in datasets:
-            for ranking_mode, panel, selected_by_label, y_metric in panels:
-                for plot_rank, item in enumerate(selected_by_label[dataset.label], start=1):
-                    y_value = getattr(item, y_metric)
-                    writer.writerow(
-                        {
-                            "id": dataset.label,
-                            "source_csv": dataset.csv_path,
-                            "ranking_mode": ranking_mode,
-                            "panel": panel,
-                            "plot_rank": plot_rank,
-                            "seed": item.seed,
-                            "source_group": item.source_group,
-                            "source_row": item.source_row,
-                            "original_rank": item.rank,
-                            "privacy": f"{item.privacy:.12g}",
-                            "semantics": f"{item.semantics:.12g}",
-                            "fidelity": f"{item.fidelity:.12g}",
-                            "min_privacy_semantics_fidelity": f"{item.min_metric:.12g}",
-                            "distance_from_perfect": f"{item.distance:.12g}",
-                            "x_metric": "privacy",
-                            "y_metric": y_metric,
-                            "x": f"{item.privacy:.12g}",
-                            "y": f"{y_value:.12g}",
-                        }
-                    )
+        row_count = max(len(top_min[dataset.label]) for dataset in datasets)
+        for row_index in range(row_count):
+            row = {}
+            for dataset in datasets:
+                if row_index >= len(top_min[dataset.label]):
+                    continue
+                item = top_min[dataset.label][row_index]
+                row[f"{dataset.label}_privacy"] = f"{item.privacy:.12g}"
+                row[f"{dataset.label}_semantics"] = f"{item.semantics:.12g}"
+                row[f"{dataset.label}_fidelity"] = f"{item.fidelity:.12g}"
+            writer.writerow(row)
     return csv_path
 
 
@@ -145,43 +107,25 @@ def plot_scores(
         dataset.label: select_by_min_metric(dataset, limit, top_one_per_seed_enabled)
         for dataset in datasets
     }
-    top_distance = {
-        dataset.label: select_by_distance(dataset, limit, top_one_per_seed_enabled)
-        for dataset in datasets
-    }
 
     selection_label = f"Top {limit} seed representatives" if top_one_per_seed_enabled else f"Top {limit}"
-    figure, axes = plt.subplots(2, 2, figsize=(12, 9), sharex=True, sharey=True)
+    figure, axes = plt.subplots(1, 2, figsize=(12, 4.8), sharex=True, sharey=True)
     scatter_panel(
-        axes[0, 0],
+        axes[0],
         datasets,
         top_min,
         "fidelity",
         f"{selection_label} by min metric: privacy vs fidelity",
     )
     scatter_panel(
-        axes[0, 1],
+        axes[1],
         datasets,
         top_min,
         "semantics",
         f"{selection_label} by min metric: privacy vs semantics",
     )
-    scatter_panel(
-        axes[1, 0],
-        datasets,
-        top_distance,
-        "fidelity",
-        f"{selection_label} by distance: privacy vs fidelity",
-    )
-    scatter_panel(
-        axes[1, 1],
-        datasets,
-        top_distance,
-        "semantics",
-        f"{selection_label} by distance: privacy vs semantics",
-    )
 
-    handles, labels = axes[0, 0].get_legend_handles_labels()
+    handles, labels = axes[0].get_legend_handles_labels()
     figure.legend(
         handles,
         labels,
@@ -195,11 +139,11 @@ def plot_scores(
     figure.savefig(output_path, dpi=200)
     plt.close(figure)
 
-    written_csv_path = write_plot_points_csv(datasets, top_min, top_distance, output_path) if write_csv else None
+    written_csv_path = write_plot_points_csv(datasets, top_min, output_path) if write_csv else None
     for dataset in datasets:
         print(
             f"{dataset.label}: plotted {len(top_min[dataset.label])} by min metric "
-            f"and {len(top_distance[dataset.label])} by distance from {dataset.csv_path}"
+            f"from {dataset.csv_path}"
         )
     print(f"Wrote plot to {output_path}")
     if written_csv_path is not None:
@@ -210,7 +154,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Compare ranked unique-solution CSVs using privacy/fidelity and "
-            "privacy/semantics scatter plots."
+            "privacy/semantics scatter plots for the top min-metric solutions."
         )
     )
     parser.add_argument(
@@ -231,7 +175,7 @@ def parse_args() -> argparse.Namespace:
         "--individuals",
         type=int,
         required=True,
-        help="Number of best individuals to plot from each CSV in each ranking.",
+        help="Number of best min-metric individuals to plot from each CSV.",
     )
     parser.add_argument(
         "-o",
@@ -250,7 +194,7 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help=(
             "Select the best individual from each seed first, then plot the top -i "
-            "seed representatives for each ranking."
+            "seed representatives."
         ),
     )
     return parser.parse_args()
