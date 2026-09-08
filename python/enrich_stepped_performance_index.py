@@ -7,6 +7,9 @@ import os
 import tempfile
 from pathlib import Path
 
+from ranked_solution_io import IndividualScores, read_individuals
+from solution_graph_metrics import GraphMetrics, graph_metrics
+
 
 PLOT_CACHE_DIR = Path(tempfile.gettempdir()) / "shield-python-plot-cache"
 PLOT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
@@ -21,6 +24,9 @@ FIELDNAMES = [
     "seed",
     "repetition",
     "graph_hash",
+    "total_operators",
+    "stateful_operators",
+    "branches_or_joins",
     "step",
     "target_rate_per_s",
     "start_second",
@@ -47,6 +53,33 @@ def resolve_per_second_path(index_csv: Path, path_text: str) -> Path:
         if candidate.exists():
             return candidate
     return index_csv.parent / path.name
+
+
+def resolve_source_csv_path(index_csv: Path, path_text: str) -> Path:
+    path = Path(path_text)
+    for candidate in (path, Path.cwd() / path, index_csv.parent / path):
+        if candidate.exists():
+            return candidate
+    return path
+
+
+def solution_lookup(csv_path: Path) -> dict[tuple[int, str, int], IndividualScores]:
+    return {
+        (individual.rank, individual.seed, individual.source_row): individual
+        for individual in read_individuals(csv_path)
+    }
+
+
+def metrics_for_index_row(
+    index_csv: Path,
+    index_row: dict[str, str],
+    cache: dict[Path, dict[tuple[int, str, int], IndividualScores]],
+) -> GraphMetrics:
+    source_csv = resolve_source_csv_path(index_csv, index_row["source_csv"])
+    if source_csv not in cache:
+        cache[source_csv] = solution_lookup(source_csv)
+    key = (int(index_row["original_rank"]), index_row["seed"], int(index_row["source_row"]))
+    return graph_metrics(cache[source_csv][key].individual)
 
 
 def read_series(path: Path) -> list[dict[str, str]]:
@@ -76,7 +109,13 @@ def target_rate(index_row: dict[str, str], step_index: int) -> float:
     return start_rate + (final_rate - start_rate) * step_index / (steps - 1)
 
 
-def step_row(index_row: dict[str, str], series: list[dict[str, str]], step_index: int, path: Path) -> dict[str, str]:
+def step_row(
+    index_row: dict[str, str],
+    metrics: GraphMetrics,
+    series: list[dict[str, str]],
+    step_index: int,
+    path: Path,
+) -> dict[str, str]:
     step_millis = int(index_row["rate_step_millis"])
     start_millis = step_index * step_millis
     end_millis = start_millis + step_millis
@@ -107,6 +146,9 @@ def step_row(index_row: dict[str, str], series: list[dict[str, str]], step_index
         "seed": index_row["seed"],
         "repetition": index_row["repetition"],
         "graph_hash": index_row["graph_hash"],
+        "total_operators": str(metrics.total_operators),
+        "stateful_operators": str(metrics.stateful_operators),
+        "branches_or_joins": str(metrics.branches_or_joins),
         "step": str(step_index + 1),
         "target_rate_per_s": f"{target_rate(index_row, step_index):.6f}",
         "start_second": str(start_second),
@@ -186,15 +228,17 @@ def clean_file_part(value: str) -> str:
 
 def enrich(index_csv: Path, plot_dir: Path) -> list[dict[str, str]]:
     enriched = []
+    metrics_cache = {}
     with index_csv.open(newline="") as file:
         for index_row in csv.DictReader(file):
             if index_row["status"] != "ok" or index_row.get("rate_mode") != "stepped":
                 continue
             path = resolve_per_second_path(index_csv, index_row["per_second_csv"])
+            metrics = metrics_for_index_row(index_csv, index_row, metrics_cache)
             series = read_series(path)
             run_steps = []
             for step_index in range(int(index_row["rate_steps"])):
-                row = step_row(index_row, series, step_index, path)
+                row = step_row(index_row, metrics, series, step_index, path)
                 run_steps.append(row)
                 enriched.append(row)
             plot_run(index_row, series, run_steps, plot_dir)

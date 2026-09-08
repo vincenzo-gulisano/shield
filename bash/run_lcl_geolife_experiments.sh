@@ -21,57 +21,61 @@ base_folder=/Users/vinmas/repositories/Shield/vincenzo/shield2/all2
 # python python/extract_unique_percentile_solutions.py $base_folder/lcl_flow_newpriv_dag/solutions-percentile.csv $base_folder/lcl_flow_newpriv_dag/individuals
 # python python/extract_unique_percentile_solutions.py $base_folder/lcl_flow_newpriv_dag_prov/solutions-percentile.csv $base_folder/lcl_flow_newpriv_dag_prov/individuals
 
+# python python/extract_ranked_solution_queries.py \
+#   --csvs $base_folder/geolife_oldpriv/individuals/unique_solutions.csv \
+#   --ids shield1-oldPriv \
+#   -i 20 \
+#   --top-one-per-seed \
+#   -o $base_folder/geolife_oldpriv_top20_queries.csv
+
+# bash bash/rescore_ranked_solution_queries.sh \
+#   geolife-mobility \
+#   $base_folder/geolife_oldpriv_top20_queries.csv \
+#   $base_folder/geolife_oldpriv_top20_true_rank.csv
+
+# python python/plot_rescored_ranked_solution_scores.py --write-csv --csvs $base_folder/geolife_oldpriv_top20_true_rank.csv -o $base_folder/geolife_oldpriv_top20_true_rank_plot.pdf
+
+# python python/extract_ranked_solution_queries.py \
+#   --csvs $base_folder/lcl_flow_oldpriv/individuals/unique_solutions.csv \
+#   --ids shield1-oldPriv \
+#   -i 20 \
+#   --top-one-per-seed \
+#   -o $base_folder/lcl_flow_oldpriv_top20_queries.csv
+
+# bash bash/rescore_ranked_solution_queries.sh \
+#   lcl-flow \
+#   $base_folder/lcl_flow_oldpriv_top20_queries.csv \
+#   $base_folder/lcl_flow_oldpriv_top20_true_rank.csv
+
+# python python/plot_rescored_ranked_solution_scores.py --write-csv --csvs $base_folder/lcl_flow_oldpriv_top20_true_rank.csv -o $base_folder/lcl_flow_oldpriv_top20_true_rank_plot.pdf
+
+# python python/plot_ranked_solution_scores.py --write-csv --top-one-per-seed --csvs $base_folder/geolife_newpriv/individuals/unique_solutions.csv $base_folder/geolife_newpriv_dag/individuals/unique_solutions.csv $base_folder/geolife_newpriv_dag_prov/individuals/unique_solutions.csv --ids shield1-newPriv shield2 shield2_prov -i 20 -o $base_folder/geolife_all.pdf
+# python python/plot_ranked_solution_scores.py --write-csv --top-one-per-seed --csvs $base_folder/lcl_flow_newpriv/individuals/unique_solutions.csv $base_folder/lcl_flow_newpriv_dag/individuals/unique_solutions.csv $base_folder/lcl_flow_newpriv_dag_prov/individuals/unique_solutions.csv --ids shield1-newPriv shield2 shield2_prov -i 20 -o $base_folder/lcl_flow_all.pdf
+
+# python python/plot_ranked_solution_operator_counts.py --write-csv --csvs $base_folder/geolife_newpriv/individuals/unique_solutions.csv $base_folder/geolife_newpriv_dag/individuals/unique_solutions.csv $base_folder/geolife_newpriv_dag_prov/individuals/unique_solutions.csv --ids shield1-newPriv shield2 shield2_prov -i 20 -o $base_folder/geolife_all_ops.pdf
+# python python/plot_ranked_solution_operator_counts.py --write-csv --csvs $base_folder/lcl_flow_newpriv/individuals/unique_solutions.csv $base_folder/lcl_flow_newpriv_dag/individuals/unique_solutions.csv $base_folder/lcl_flow_newpriv_dag_prov/individuals/unique_solutions.csv --ids shield1-newPriv shield2 shield2_prov -i 20 -o $base_folder/lcl_flow_all_ops.pdf
+
+# python python/plot_solutions_percentile_convergence.py $base_folder/geolife_newpriv_dag_prov/solutions-percentile.csv --write-csv --title geolife-08 -o $base_folder/geolife_08_convergence.pdf --max-mode actual
+
+# python python/plot_solutions_percentile_convergence.py $base_folder/lcl_flow_newpriv_dag_prov/solutions-percentile.csv --write-csv --title lcl-flow-08 -o $base_folder/lcl_flow_08_convergence.pdf --max-mode actual
+
+# Extracting queries to run throughput/latency benchmarks
+
 python python/extract_ranked_solution_queries.py \
-  --csvs $base_folder/geolife_oldpriv/individuals/unique_solutions.csv \
-  --ids shield1-oldPriv \
+  --csvs $base_folder/geolife_oldpriv/individuals/unique_solutions.csv $base_folder/geolife_newpriv/individuals/unique_solutions.csv $base_folder/geolife_newpriv_dag/individuals/unique_solutions.csv $base_folder/geolife_newpriv_dag_prov/individuals/unique_solutions.csv \
+  --ids shield1-oldPriv shield1-newPriv shield2 shield2_prov \
   -i 20 \
   --top-one-per-seed \
-  -o $base_folder/geolife_oldpriv_top20_queries.csv
+  -o $base_folder/geolife_benchmark_queries.csv
 
-bash bash/rescore_ranked_solution_queries.sh \
-  geolife-mobility \
-  $base_folder/geolife_oldpriv_top20_queries.csv \
-  $base_folder/geolife_oldpriv_top20_true_rank.csv
-
-python python/plot_rescored_ranked_solution_scores.py \
-  --write-csv \
-  --csvs $base_folder/geolife_oldpriv_top20_true_rank.csv \
-  -o $base_folder/geolife_oldpriv_top20_true_rank_plot.pdf
 
 python python/extract_ranked_solution_queries.py \
-  --csvs $base_folder/lcl_flow_oldpriv/individuals/unique_solutions.csv \
-  --ids shield1-oldPriv \
+  --csvs $base_folder/lcl_flow_oldpriv/individuals/unique_solutions.csv $base_folder/lcl_flow_newpriv/individuals/unique_solutions.csv $base_folder/lcl_flow_newpriv_dag/individuals/unique_solutions.csv $base_folder/lcl_flow_newpriv_dag_prov/individuals/unique_solutions.csv \
+  --ids shield1-oldPriv shield1-newPriv shield2 shield2_prov \
   -i 20 \
   --top-one-per-seed \
-  -o $base_folder/lcl_flow_oldpriv_top20_queries.csv
+  -o $base_folder/lcl_flow_benchmark_queries.csv
 
-bash bash/rescore_ranked_solution_queries.sh \
-  lcl-flow \
-  $base_folder/lcl_flow_oldpriv_top20_queries.csv \
-  $base_folder/lcl_flow_oldpriv_top20_true_rank.csv
-
-python python/plot_rescored_ranked_solution_scores.py \
-  --write-csv \
-  --csvs $base_folder/lcl_flow_oldpriv_top20_true_rank.csv \
-  -o $base_folder/lcl_flow_oldpriv_top20_true_rank_plot.pdf
-
-python python/plot_ranked_solution_scores.py --write-csv --top-one-per-seed --csvs $base_folder/geolife_newpriv/individuals/unique_solutions.csv $base_folder/geolife_newpriv_dag/individuals/unique_solutions.csv $base_folder/geolife_newpriv_dag_prov/individuals/unique_solutions.csv --ids shield1-newPriv shield2 shield2_prov -i 20 -o $base_folder/geolife_all.pdf
-python python/plot_ranked_solution_scores.py --write-csv --top-one-per-seed --csvs $base_folder/lcl_flow_newpriv/individuals/unique_solutions.csv $base_folder/lcl_flow_newpriv_dag/individuals/unique_solutions.csv $base_folder/lcl_flow_newpriv_dag_prov/individuals/unique_solutions.csv --ids shield1-newPriv shield2 shield2_prov -i 20 -o $base_folder/lcl_flow_all.pdf
-
-python python/plot_ranked_solution_operator_counts.py --write-csv --csvs $base_folder/geolife_oldpriv/individuals/unique_solutions.csv $base_folder/geolife_newpriv/individuals/unique_solutions.csv $base_folder/geolife_newpriv_dag/individuals/unique_solutions.csv $base_folder/geolife_newpriv_dag_prov/individuals/unique_solutions.csv --ids shield1-oldPriv shield1-newPriv shield2 shield2_prov -i 20 -o $base_folder/geolife_all_ops.pdf
-python python/plot_ranked_solution_operator_counts.py --write-csv --csvs $base_folder/lcl_flow_oldpriv/individuals/unique_solutions.csv $base_folder/lcl_flow_newpriv/individuals/unique_solutions.csv $base_folder/lcl_flow_newpriv_dag/individuals/unique_solutions.csv $base_folder/lcl_flow_newpriv_dag_prov/individuals/unique_solutions.csv --ids shield1-oldPriv shield1-newPriv shield2 shield2_prov -i 20 -o $base_folder/lcl_flow_all_ops.pdf
-
-python python/plot_solutions_percentile_convergence.py \
-  $base_folder/geolife_newpriv_dag_prov/solutions-percentile.csv \
-  --write-csv \
-  --title geolife-08 \
-  -o $base_folder/geolife_08_convergence.pdf
-
-python python/plot_solutions_percentile_convergence.py \
-  $base_folder/lcl_flow_newpriv_dag_prov/solutions-percentile.csv \
-  --write-csv \
-  --title lcl-flow-08 \
-  -o $base_folder/lcl_flow_08_convergence.pdf
 #########################
 
 # java -jar target/Shield-1.0-SNAPSHOT-jar-with-dependencies.jar -v -nt 1 -f src/main/resources/configs/lcl.flow.02.true-rank.nsga2.txt

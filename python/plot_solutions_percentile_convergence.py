@@ -66,13 +66,11 @@ class IterationScore:
     seed: str
     iteration: int
     x: float
-    min_balanced: float
     max_balanced: float
 
 
 @dataclass(frozen=True)
 class SummaryRow:
-    score_kind: str
     x: float
     n_seeds: int
     mean: float
@@ -121,7 +119,6 @@ def read_scores(csv_path: Path, x_column: str) -> list[IterationScore]:
                     seed=row[SEED_COLUMN],
                     iteration=required_int(row, ITERATION_COLUMN, csv_path),
                     x=required_float(row, x_column, csv_path),
-                    min_balanced=min(balanced_values),
                     max_balanced=max(balanced_values),
                 )
             )
@@ -137,24 +134,21 @@ def cumulative_best(scores: list[IterationScore]) -> list[IterationScore]:
 
     cumulative = []
     for seed_scores in by_seed.values():
-        best_min = -math.inf
         best_max = -math.inf
         for score in sorted(seed_scores, key=lambda item: (item.iteration, item.x)):
-            best_min = max(best_min, score.min_balanced)
             best_max = max(best_max, score.max_balanced)
             cumulative.append(
                 IterationScore(
                     seed=score.seed,
                     iteration=score.iteration,
                     x=score.x,
-                    min_balanced=best_min,
                     max_balanced=best_max,
                 )
             )
     return sorted(cumulative, key=lambda item: (item.x, item.seed, item.iteration))
 
 
-def count_decreases(scores: list[IterationScore], metric: str) -> int:
+def count_decreases(scores: list[IterationScore]) -> int:
     by_seed: dict[str, list[IterationScore]] = defaultdict(list)
     for score in scores:
         by_seed[score.seed].append(score)
@@ -163,7 +157,7 @@ def count_decreases(scores: list[IterationScore], metric: str) -> int:
     for seed_scores in by_seed.values():
         previous = None
         for score in sorted(seed_scores, key=lambda item: (item.iteration, item.x)):
-            value = getattr(score, metric)
+            value = score.max_balanced
             if previous is not None and value < previous - 1e-12:
                 decreases += 1
             previous = value
@@ -183,17 +177,16 @@ def quantile(values: list[float], q: float) -> float:
     return sorted_values[lower] * (1.0 - weight) + sorted_values[upper] * weight
 
 
-def summarize(scores: list[IterationScore], metric: str, score_kind: str) -> list[SummaryRow]:
+def summarize(scores: list[IterationScore]) -> list[SummaryRow]:
     by_x: dict[float, list[float]] = defaultdict(list)
     for score in scores:
-        by_x[score.x].append(getattr(score, metric))
+        by_x[score.x].append(score.max_balanced)
 
     rows = []
     for x in sorted(by_x):
         values = by_x[x]
         rows.append(
             SummaryRow(
-                score_kind=score_kind,
                 x=x,
                 n_seeds=len(values),
                 mean=statistics.fmean(values),
@@ -210,87 +203,65 @@ def output_csv_path(output_path: Path) -> Path:
     return output_path.with_suffix(".csv")
 
 
-def write_summary_csv(
-    summary_rows: list[SummaryRow],
-    csv_path: Path,
-    input_csv: Path,
-    x_column: str,
-    cumulative: bool,
-) -> None:
+def run_column(seed: str) -> str:
+    return f"run_{seed}"
+
+
+def seed_key(seed: str) -> tuple[int, int | str]:
+    return (0, int(seed)) if seed.isdigit() else (1, seed)
+
+
+def write_summary_csv(scores: list[IterationScore], csv_path: Path) -> None:
+    by_x_seed: dict[float, dict[str, float]] = defaultdict(dict)
+    seeds = sorted({score.seed for score in scores}, key=seed_key)
+    for score in scores:
+        by_x_seed[score.x][score.seed] = score.max_balanced
+
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     with csv_path.open("w", newline="") as file:
-        fieldnames = [
-            "input_csv",
-            "x_column",
-            "mode",
-            "score_kind",
-            "x",
-            "n_seeds",
-            "mean",
-            "q1",
-            "q3",
-            "min_seed_value",
-            "max_seed_value",
-        ]
+        fieldnames = [run_column(seed) for seed in seeds]
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
-        for row in summary_rows:
+        for x in sorted(by_x_seed):
             writer.writerow(
                 {
-                    "input_csv": input_csv,
-                    "x_column": x_column,
-                    "mode": "cumulative" if cumulative else "raw",
-                    "score_kind": row.score_kind,
-                    "x": f"{row.x:.12g}",
-                    "n_seeds": row.n_seeds,
-                    "mean": f"{row.mean:.12g}",
-                    "q1": f"{row.q1:.12g}",
-                    "q3": f"{row.q3:.12g}",
-                    "min_seed_value": f"{row.min_seed_value:.12g}",
-                    "max_seed_value": f"{row.max_seed_value:.12g}",
+                    run_column(seed): f"{by_x_seed[x][seed]:.12g}" if seed in by_x_seed[x] else ""
+                    for seed in seeds
                 }
             )
 
 
 def plot_summary(
-    min_rows: list[SummaryRow],
     max_rows: list[SummaryRow],
     output_path: Path,
     x_column: str,
     title: str | None,
-    cumulative: bool,
+    max_mode: str,
 ) -> None:
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    panels = [
-        ("Minimum of selected balanced scores", min_rows, "#1f77b4"),
-        ("Maximum of selected balanced scores", max_rows, "#2ca02c"),
-    ]
-    figure, axes = plt.subplots(1, 2, figsize=(12, 4.8), sharey=True)
-    mode_label = "cumulative best-so-far" if cumulative else "raw per-iteration"
+    figure, ax = plt.subplots(figsize=(7.0, 4.8))
+    mode_label = "cumulative best-so-far" if max_mode == "cumulative" else "actual per-iteration"
+    xs = [row.x for row in max_rows]
+    means = [row.mean for row in max_rows]
+    q1s = [row.q1 for row in max_rows]
+    q3s = [row.q3 for row in max_rows]
+    ax.fill_between(xs, q1s, q3s, color="#2ca02c", alpha=0.2, linewidth=0.0, label="Q1-Q3")
+    ax.plot(xs, means, color="#2ca02c", linewidth=1.8, label="mean")
+    ax.set_xlabel(x_column)
+    ax.set_ylabel("max min(privacy, semantics, fidelity)")
+    ax.set_ylim(-0.02, 1.02)
+    ax.grid(True, linewidth=0.4, alpha=0.35)
+    ax.legend(loc="lower right", frameon=False)
 
-    for ax, (panel_title, rows, color) in zip(axes, panels):
-        xs = [row.x for row in rows]
-        means = [row.mean for row in rows]
-        q1s = [row.q1 for row in rows]
-        q3s = [row.q3 for row in rows]
-        ax.fill_between(xs, q1s, q3s, color=color, alpha=0.2, linewidth=0.0, label="Q1-Q3")
-        ax.plot(xs, means, color=color, linewidth=1.8, label="mean")
-        ax.set_title(panel_title)
-        ax.set_xlabel(x_column)
-        ax.set_ylim(-0.02, 1.02)
-        ax.grid(True, linewidth=0.4, alpha=0.35)
-        ax.legend(loc="lower right", frameon=False)
-
-    axes[0].set_ylabel("min(privacy, semantics, fidelity)")
     if title:
         figure.suptitle(f"{title} ({mode_label})")
     else:
-        figure.suptitle(f"Balanced-score convergence ({mode_label})")
-    figure.tight_layout(rect=(0, 0, 1, 0.94))
+        figure.suptitle(f"Max balanced-score convergence ({mode_label})")
+    figure.tight_layout(rect=(0, 0, 1, 0.93))
     output_path.parent.mkdir(parents=True, exist_ok=True)
     figure.savefig(output_path, dpi=200)
     plt.close(figure)
@@ -299,8 +270,8 @@ def plot_summary(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Plot convergence from solutions-percentile.csv using the min and max "
-            "of min(privacy, semantics, fidelity) across the recorded percentile "
+            "Plot convergence from solutions-percentile.csv using the max of "
+            "min(privacy, semantics, fidelity) across the recorded percentile "
             "representative solutions at each seed iteration."
         )
     )
@@ -322,9 +293,10 @@ def parse_args() -> argparse.Namespace:
         help=f"CSV column to use on the x-axis. Default: {ITERATION_COLUMN}.",
     )
     parser.add_argument(
-        "--raw",
-        action="store_true",
-        help="Plot raw per-iteration values instead of cumulative best-so-far values.",
+        "--max-mode",
+        choices=["cumulative", "actual"],
+        default="cumulative",
+        help="Use cumulative best-so-far max or actual per-iteration max. Default: cumulative.",
     )
     parser.add_argument(
         "--write-csv",
@@ -341,22 +313,19 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     raw_scores = read_scores(args.input_csv, args.x_column)
-    cumulative = not args.raw
-    scores = cumulative_best(raw_scores) if cumulative else raw_scores
+    scores = cumulative_best(raw_scores) if args.max_mode == "cumulative" else raw_scores
 
-    min_rows = summarize(scores, "min_balanced", "min_balanced")
-    max_rows = summarize(scores, "max_balanced", "max_balanced")
-    plot_summary(min_rows, max_rows, args.output, args.x_column, args.title, cumulative)
+    max_rows = summarize(scores)
+    plot_summary(max_rows, args.output, args.x_column, args.title, args.max_mode)
 
     csv_path = None
     if args.write_csv:
         csv_path = output_csv_path(args.output)
-        write_summary_csv(min_rows + max_rows, csv_path, args.input_csv, args.x_column, cumulative)
+        write_summary_csv(scores, csv_path)
 
     print(
         f"Read {len(raw_scores)} rows from {args.input_csv}; "
-        f"min decreases={count_decreases(raw_scores, 'min_balanced')}, "
-        f"max decreases={count_decreases(raw_scores, 'max_balanced')}"
+        f"max decreases={count_decreases(raw_scores)}"
     )
     print(f"Wrote convergence plot to {args.output}")
     if csv_path is not None:

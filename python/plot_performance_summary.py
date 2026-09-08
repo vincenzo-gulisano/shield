@@ -35,6 +35,9 @@ AVERAGE_FIELDS = [
     "max_latency_ms",
     "max_latency_minus_avg_latency_ms",
     "latency_slope_ms_per_s",
+    "total_operators",
+    "stateful_operators",
+    "branches_or_joins",
 ]
 
 
@@ -96,7 +99,8 @@ def average_repetitions(rows: list[dict[str, str]], selection: str) -> dict[str,
         "crosses_cooldown": str(any(row["crosses_cooldown"] == "true" for row in rows)).lower(),
     }
     for field in AVERAGE_FIELDS:
-        averaged[field] = average(rows, field)
+        if field in first:
+            averaged[field] = average(rows, field)
     return averaged
 
 
