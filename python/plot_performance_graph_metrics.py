@@ -1,28 +1,22 @@
 #!/usr/bin/env python3
 
 import argparse
-import csv
 from pathlib import Path
 
-from plot_performance_summary import EXPERIMENT_LABELS, EXPERIMENT_ORDER, read_plot_rows
+from plot_performance_summary import (
+    EXPERIMENT_LABELS,
+    EXPERIMENT_ORDER,
+    read_plot_rows,
+    write_boxplot_csvs,
+)
 
 
 METRICS = [
-    ("total_operators", "Total operators", "count"),
-    ("stateful_operators", "Stateful operators", "count"),
-    ("branches_or_joins", "Branches/joins", "count"),
-    ("output_input_ratio", "Output/input ratio", "ratio"),
+    ("total_operators", "Total operators", "count", "total_operators"),
+    ("stateful_operators", "Stateful operators", "count", "stateful_operators"),
+    ("branches_or_joins", "Branches/joins", "count", "branches_joins"),
+    ("output_input_ratio", "Output/input ratio", "ratio", "output_input_ratio"),
 ]
-
-
-def write_plot_csv(rows: list[dict[str, str]], output_pdf: Path) -> Path:
-    csv_path = output_pdf.with_suffix(".csv")
-    csv_path.parent.mkdir(parents=True, exist_ok=True)
-    with csv_path.open("w", newline="") as file:
-        writer = csv.DictWriter(file, fieldnames=list(rows[0]))
-        writer.writeheader()
-        writer.writerows(rows)
-    return csv_path
 
 
 def metric_values(rows: list[dict[str, str]], metric: str, experiment: str) -> list[float]:
@@ -39,7 +33,7 @@ def plot(rows: list[dict[str, str]], output_pdf: Path, title: str | None) -> Non
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    missing = [metric for metric, _, _ in METRICS if metric not in rows[0]]
+    missing = [metric for metric, _, _, _ in METRICS if metric not in rows[0]]
     if missing:
         raise ValueError(
             "Missing graph metric column(s): "
@@ -53,7 +47,7 @@ def plot(rows: list[dict[str, str]], output_pdf: Path, title: str | None) -> Non
     if title:
         fig.suptitle(title)
 
-    for ax, (metric, metric_title, ylabel) in zip(axes.flat, METRICS):
+    for ax, (metric, metric_title, ylabel, _) in zip(axes.flat, METRICS):
         values = [metric_values(rows, metric, experiment) for experiment in EXPERIMENT_ORDER]
         boxes = ax.boxplot(values, tick_labels=labels, patch_artist=True, showfliers=True)
         for patch, color in zip(boxes["boxes"], colors):
@@ -89,9 +83,14 @@ def main() -> None:
     args = parse_args()
     rows = read_plot_rows(args.steps_csv, args.selection)
     plot(rows, args.output, args.title)
-    csv_path = write_plot_csv(rows, args.output)
+    csv_paths = write_boxplot_csvs(
+        rows,
+        args.output,
+        [(metric, suffix) for metric, _, _, suffix in METRICS],
+    )
     print(f"Wrote {args.output}")
-    print(f"Wrote {csv_path}")
+    for csv_path in csv_paths:
+        print(f"Wrote {csv_path}")
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ from ranked_solution_io import (
     DatasetScores as Dataset,
     IndividualScores as Individual,
     read_individuals,
-    top_by_min_metric,
+    select_by_min_metric,
 )
 from solution_graph_metrics import operator_types as solution_operator_types
 
@@ -79,9 +79,11 @@ def operator_types(individual: Individual) -> list[str]:
     return operators
 
 
-def operator_counts(dataset: Dataset, limit: int) -> Counter[str]:
+def operator_counts(
+    dataset: Dataset, limit: int, top_one_per_seed_enabled: bool = False
+) -> Counter[str]:
     counts: Counter[str] = Counter()
-    for individual in top_by_min_metric(dataset.individuals, limit):
+    for individual in select_by_min_metric(dataset, limit, top_one_per_seed_enabled):
         counts.update(operator_types(individual))
     return counts
 
@@ -124,14 +126,20 @@ def write_counts_csv(
     return csv_path
 
 
-def plot_counts(datasets: list[Dataset], limit: int, output_path: Path, write_csv: bool) -> None:
+def plot_counts(
+    datasets: list[Dataset],
+    limit: int,
+    output_path: Path,
+    write_csv: bool,
+    top_one_per_seed_enabled: bool = False,
+) -> None:
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
     counts_by_label = {
-        dataset.label: operator_counts(dataset, limit)
+        dataset.label: operator_counts(dataset, limit, top_one_per_seed_enabled)
         for dataset in datasets
     }
     operators = operator_order(counts_by_label)
@@ -159,7 +167,8 @@ def plot_counts(datasets: list[Dataset], limit: int, output_path: Path, write_cs
             linewidth=0.5,
         )
 
-    ax.set_title(f"Operator counts in top {limit} solutions by min metric")
+    selection_label = "seed representatives" if top_one_per_seed_enabled else "solutions"
+    ax.set_title(f"Operator counts in top {limit} {selection_label} by min metric")
     ax.set_xlabel("operator type")
     ax.set_ylabel("count across selected solutions")
     ax.set_xticks(x_positions)
@@ -174,7 +183,7 @@ def plot_counts(datasets: list[Dataset], limit: int, output_path: Path, write_cs
 
     written_csv_path = write_counts_csv(datasets, limit, counts_by_label, operators, output_path) if write_csv else None
     for dataset in datasets:
-        selected = top_by_min_metric(dataset.individuals, limit)
+        selected = select_by_min_metric(dataset, limit, top_one_per_seed_enabled)
         counts_text = ", ".join(
             f"{operator}={counts_by_label[dataset.label].get(operator, 0)}"
             for operator in operators
@@ -226,6 +235,14 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Also write the plotted operator counts next to the output using a .csv extension.",
     )
+    parser.add_argument(
+        "--top-one-per-seed",
+        action="store_true",
+        help=(
+            "Select the best individual from each seed first, then count operators "
+            "in the top -i seed representatives."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -242,7 +259,7 @@ def main() -> None:
         Dataset(label=label, csv_path=csv_path, individuals=read_individuals(csv_path))
         for csv_path, label in zip(args.csvs, args.ids)
     ]
-    plot_counts(datasets, args.individuals, args.output, args.write_csv)
+    plot_counts(datasets, args.individuals, args.output, args.write_csv, args.top_one_per_seed)
 
 
 if __name__ == "__main__":

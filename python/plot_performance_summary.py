@@ -39,6 +39,20 @@ AVERAGE_FIELDS = [
     "stateful_operators",
     "branches_or_joins",
 ]
+BOXPLOT_CSV_FIELDS = [
+    "setup",
+    "whisker_low",
+    "q1",
+    "q2",
+    "q3",
+    "whisker_up",
+    "outliers",
+]
+OUTLIER_SEPARATOR = "|"
+SUMMARY_EXPORT_METRICS = [
+    ("input_throughput_per_s", "input_throughput"),
+    ("avg_latency_ms", "latency"),
+]
 
 
 def read_plot_rows(steps_csv: Path, selection: str) -> list[dict[str, str]]:
@@ -128,14 +142,62 @@ def acceptable_latency(row: dict[str, str]) -> bool:
     return float(row["max_latency_ms"]) <= 3.0 * float(row["avg_latency_ms"])
 
 
-def write_summary_csv(rows: list[dict[str, str]], output_pdf: Path) -> Path:
-    csv_path = output_pdf.with_suffix(".csv")
-    csv_path.parent.mkdir(parents=True, exist_ok=True)
-    with csv_path.open("w", newline="") as file:
-        writer = csv.DictWriter(file, fieldnames=list(rows[0]))
-        writer.writeheader()
-        writer.writerows(rows)
-    return csv_path
+def metric_values(rows: list[dict[str, str]], metric: str, experiment: str) -> list[float]:
+    return [
+        float(row[metric])
+        for row in rows
+        if row["experiment"] == experiment and row.get(metric, "")
+    ]
+
+
+def boxplot_summary(values: list[float]) -> dict[str, str]:
+    if not values:
+        raise ValueError("Cannot summarize an empty boxplot series")
+
+    from matplotlib.cbook import boxplot_stats
+
+    stats = boxplot_stats(values, whis=1.5)[0]
+    return {
+        "whisker_low": f"{stats['whislo']:.12g}",
+        "q1": f"{stats['q1']:.12g}",
+        "q2": f"{stats['med']:.12g}",
+        "q3": f"{stats['q3']:.12g}",
+        "whisker_up": f"{stats['whishi']:.12g}",
+        "outliers": OUTLIER_SEPARATOR.join(
+            f"{value:.12g}" for value in sorted(stats["fliers"])
+        ),
+    }
+
+
+def boxplot_csv_path(output_pdf: Path, suffix: str) -> Path:
+    return output_pdf.with_name(f"{output_pdf.stem}_{suffix}.csv")
+
+
+def write_boxplot_csvs(
+    rows: list[dict[str, str]],
+    output_pdf: Path,
+    metrics: list[tuple[str, str]],
+) -> list[Path]:
+    csv_paths = []
+    for metric, suffix in metrics:
+        csv_path = boxplot_csv_path(output_pdf, suffix)
+        csv_path.parent.mkdir(parents=True, exist_ok=True)
+        with csv_path.open("w", newline="") as file:
+            writer = csv.DictWriter(file, fieldnames=BOXPLOT_CSV_FIELDS)
+            writer.writeheader()
+            for experiment in EXPERIMENT_ORDER:
+                writer.writerow(
+                    {
+                        "setup": EXPERIMENT_LABELS[experiment].replace("\n", " "),
+                        **boxplot_summary(metric_values(rows, metric, experiment)),
+                    }
+                )
+        csv_paths.append(csv_path)
+    return csv_paths
+
+
+def write_summary_csvs(rows: list[dict[str, str]], output_pdf: Path) -> list[Path]:
+    return write_boxplot_csvs(rows, output_pdf, SUMMARY_EXPORT_METRICS)
 
 
 def plot(rows: list[dict[str, str]], output_pdf: Path, title: str | None) -> None:
@@ -206,9 +268,10 @@ def main() -> None:
     args = parse_args()
     rows = read_plot_rows(args.steps_csv, args.selection)
     plot(rows, args.output, args.title)
-    csv_path = write_summary_csv(rows, args.output)
+    csv_paths = write_summary_csvs(rows, args.output)
     print(f"Wrote {args.output}")
-    print(f"Wrote {csv_path}")
+    for csv_path in csv_paths:
+        print(f"Wrote {csv_path}")
 
 
 if __name__ == "__main__":

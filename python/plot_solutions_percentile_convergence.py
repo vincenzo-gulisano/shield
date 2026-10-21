@@ -73,7 +73,7 @@ class IterationScore:
 class SummaryRow:
     x: float
     n_seeds: int
-    mean: float
+    median: float
     q1: float
     q3: float
     min_seed_value: float
@@ -189,7 +189,7 @@ def summarize(scores: list[IterationScore]) -> list[SummaryRow]:
             SummaryRow(
                 x=x,
                 n_seeds=len(values),
-                mean=statistics.fmean(values),
+                median=statistics.median(values),
                 q1=quantile(values, 0.25),
                 q3=quantile(values, 0.75),
                 min_seed_value=min(values),
@@ -203,30 +203,19 @@ def output_csv_path(output_path: Path) -> Path:
     return output_path.with_suffix(".csv")
 
 
-def run_column(seed: str) -> str:
-    return f"run_{seed}"
-
-
-def seed_key(seed: str) -> tuple[int, int | str]:
-    return (0, int(seed)) if seed.isdigit() else (1, seed)
-
-
-def write_summary_csv(scores: list[IterationScore], csv_path: Path) -> None:
-    by_x_seed: dict[float, dict[str, float]] = defaultdict(dict)
-    seeds = sorted({score.seed for score in scores}, key=seed_key)
-    for score in scores:
-        by_x_seed[score.x][score.seed] = score.max_balanced
-
+def write_summary_csv(rows: list[SummaryRow], csv_path: Path) -> None:
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     with csv_path.open("w", newline="") as file:
-        fieldnames = [run_column(seed) for seed in seeds]
+        fieldnames = ["x", "q1", "q2", "q3"]
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
-        for x in sorted(by_x_seed):
+        for row in rows:
             writer.writerow(
                 {
-                    run_column(seed): f"{by_x_seed[x][seed]:.12g}" if seed in by_x_seed[x] else ""
-                    for seed in seeds
+                    "x": f"{row.x:.12g}",
+                    "q1": f"{row.q1:.12g}",
+                    "q2": f"{row.median:.12g}",
+                    "q3": f"{row.q3:.12g}",
                 }
             )
 
@@ -246,11 +235,11 @@ def plot_summary(
     figure, ax = plt.subplots(figsize=(7.0, 4.8))
     mode_label = "cumulative best-so-far" if max_mode == "cumulative" else "actual per-iteration"
     xs = [row.x for row in max_rows]
-    means = [row.mean for row in max_rows]
+    medians = [row.median for row in max_rows]
     q1s = [row.q1 for row in max_rows]
     q3s = [row.q3 for row in max_rows]
     ax.fill_between(xs, q1s, q3s, color="#2ca02c", alpha=0.2, linewidth=0.0, label="Q1-Q3")
-    ax.plot(xs, means, color="#2ca02c", linewidth=1.8, label="mean")
+    ax.plot(xs, medians, color="#2ca02c", linewidth=1.8, label="median")
     ax.set_xlabel(x_column)
     ax.set_ylabel("max min(privacy, semantics, fidelity)")
     ax.set_ylim(-0.02, 1.02)
@@ -272,7 +261,8 @@ def parse_args() -> argparse.Namespace:
         description=(
             "Plot convergence from solutions-percentile.csv using the max of "
             "min(privacy, semantics, fidelity) across the recorded percentile "
-            "representative solutions at each seed iteration."
+            "representative solutions at each seed iteration, showing the median "
+            "and Q1-Q3 band across seeds."
         )
     )
     parser.add_argument(
@@ -321,7 +311,7 @@ def main() -> None:
     csv_path = None
     if args.write_csv:
         csv_path = output_csv_path(args.output)
-        write_summary_csv(scores, csv_path)
+        write_summary_csv(max_rows, csv_path)
 
     print(
         f"Read {len(raw_scores)} rows from {args.input_csv}; "
